@@ -1,0 +1,42 @@
+name: EAS dev build
+
+# Builds the development client in Expo's cloud. Run it by hand from the Actions tab.
+# Needs an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)
+# and the project linked once with `npx eas-cli init` so app.json has an EAS project id.
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile from eas.json
+        type: choice
+        options: [development, preview]
+        default: development
+
+jobs:
+  eas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check for EXPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "::error::Add an EXPO_TOKEN repository secret first."
+            exit 1
+          fi
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      - name: Start the cloud build
+        run: eas build --profile ${{ inputs.profile }} --platform android --non-interactive --no-wait
