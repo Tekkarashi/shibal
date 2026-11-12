@@ -38,7 +38,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!toast) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), toast.action ? 5000 : 2800);
+    // Undo stays up long enough to read and reach (Material suggests 4-10s for actions).
+    timer.current = setTimeout(() => setToast(null), toast.action ? 8000 : 2800);
     return () => {
       if (timer.current) clearTimeout(timer.current);
     };
