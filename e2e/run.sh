@@ -67,7 +67,9 @@ share_file() {
   echo "  sharing file://$dest as $mime"
   adb logcat -c || true
   adb shell "am start -a android.intent.action.SEND -t $mime --eu android.intent.extra.STREAM file://$dest $PKG"
-  sleep 4
+  sleep 1.5
+  adb exec-out screencap -p > "$OUT/just-after-sharing-$name.png" || true
+  sleep 3
 }
 
 # Prints the app's own log lines and any crash since the last clear, so a failure shows its cause.

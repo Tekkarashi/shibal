@@ -128,7 +128,7 @@ function Effects({ navReady }: { navReady: boolean }) {
       const dup = draft.url ? store.items.find((i) => i.url && normalizeUrl(i.url) === normalizeUrl(draft.url!)) : undefined;
       navRef.dispatch(StackActions.push('form', dup ? { id: dup.id, notice: 'You already saved this link.' } : { draft }));
     })()
-      .catch(() => undefined)
+      .catch((e) => console.warn('[share] could not handle the share', String(e)))
       .finally(() => resetShareIntent());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasShareIntent, store.loaded, navReady]);

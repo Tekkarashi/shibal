@@ -18,7 +18,9 @@ export async function keepSharedImage(src: string, mime?: string | null, name?: 
     const dest = new File(dir, `${id}.${extensionFor(name, mime)}`);
     await new File(src).copy(dest);
     return dest.uri;
-  } catch {
+  } catch (e) {
+    // Shows up in the device log, so a share that fails on someone's phone can be diagnosed.
+    console.warn('[share] could not keep image from', src, String(e));
     return null;
   }
 }
