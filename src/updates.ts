@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as Application from 'expo-application';
+import Constants from 'expo-constants';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { isNewerVersion, releaseNotesSummary } from './logic';
@@ -14,6 +15,16 @@ export interface UpdateInfo {
   apkUrl: string;
   sizeBytes: number;
   page: string;
+  /** Signed with Shibal's private key (every release from 0.2.0). */
+  newSigningKey: boolean;
+}
+
+/** Marker the release workflow adds to the notes of releases signed with the private key. */
+export const SIGNING_MARKER = '<!-- shibal-signing: release -->';
+
+/** Which key signed this copy of the app: the public debug key (0.1.x) or Shibal's own. */
+export function installedSigning(): 'debug' | 'release' {
+  return Constants.expoConfig?.extra?.signedWith === 'release' ? 'release' : 'debug';
 }
 
 export function installedVersion(): string {
@@ -43,6 +54,7 @@ export async function fetchLatestRelease(): Promise<UpdateInfo | null> {
     apkUrl: apk.browser_download_url,
     sizeBytes: apk.size,
     page: r.html_url ?? RELEASES_PAGE,
+    newSigningKey: (r.body ?? '').includes(SIGNING_MARKER),
   };
 }
 

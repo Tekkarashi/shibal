@@ -1,0 +1,39 @@
+# Restores e2e/fixtures/shibal-backup.json (pushed to Download by e2e/run.sh) through
+# Android's own file picker, then checks both items came back, one with its flyer.
+appId: com.tekkarashi.shibal
+---
+- launchApp
+- tapOn:
+    id: "settings"
+- scrollUntilVisible:
+    element:
+      text: "Restore from a backup"
+- tapOn: "Restore from a backup"
+# Android's file picker: open the side panel, go to Downloads, pick the file.
+- extendedWaitUntil:
+    visible: ".*(Recent|Downloads|Files|Show roots).*"
+    timeout: 20000
+- runFlow:
+    when:
+      notVisible: "shibal-e2e-backup.json"
+    commands:
+      - tapOn:
+          text: "Show roots"
+          optional: true
+      - tapOn:
+          text: "Downloads"
+- tapOn: "shibal-e2e-backup.json"
+- extendedWaitUntil:
+    visible: 'Restore 2 items\?'
+    timeout: 15000
+- takeScreenshot: 17-restore-confirm
+- tapOn:
+    id: "dialog-confirm"
+- back
+- scrollUntilVisible:
+    element:
+      text: "Restored Rhodes Scholarship"
+- scrollUntilVisible:
+    element:
+      text: "Restored Flyer Programme"
+- takeScreenshot: 18-restored-items

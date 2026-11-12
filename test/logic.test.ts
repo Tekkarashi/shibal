@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   bucketOf, groupItems, buildLadder, buildDigests, parseDeadline, parseWhatsAppExport,
   itemsFromImport, formatDeadline, timeLeft, extractUrls, normalizeUrl, titleFrom, draftFromShared,
-  headline, countdown, nextUp, isNewerVersion, releaseNotesSummary,
+  headline, countdown, nextUp, isNewerVersion, releaseNotesSummary, makeBackup, readBackup, mergeItems,
 } from '../src/logic';
 import type { Item } from '../src/types';
 
@@ -316,4 +316,43 @@ test('releaseNotesSummary keeps what is new and drops install steps', () => {
   const body = "## What's new\n\n- **Share flyers** from WhatsApp\n- New logo\n\n## Install on Android\n\n1. Download Shibal.apk";
   assert.equal(releaseNotesSummary(body), "What's new\n\n• Share flyers from WhatsApp\n• New logo");
   assert.equal(releaseNotesSummary('x'.repeat(700)).length, 600);
+});
+
+/* ---------------- backups ---------------- */
+
+test('a backup round-trips and restoring merges without losing anything', () => {
+  const a = item({ id: 'a', title: 'Old title', url: 'https://x.org/a', updatedAt: at(2026, 11, 1, 9, 0) });
+  const b = item({ id: 'b', title: 'Has a flyer', imageUri: 'file:///data/attachments/b.jpg' } as Partial<Item>);
+  const backup = makeBackup([a, b], { b: { ext: 'jpg', base64: 'AAAA' } }, NOW, '0.1.4');
+  const read = readBackup(JSON.stringify(backup));
+  assert.equal(read.items.length, 2);
+  assert.equal(read.items.find((i) => i.id === 'b')!.imageUri, 'backup-image:b');
+  assert.equal(read.images.b.base64, 'AAAA');
+  assert.equal(read.items.find((i) => i.id === 'a')!.imageUri, null);
+
+  // The phone now has a newer edit of a, plus its own item c.
+  const aNewer = { ...a, title: 'Edited after the backup', updatedAt: at(2026, 11, 10, 9, 0) };
+  const c = item({ id: 'c', url: 'https://x.org/c' });
+  const merged = mergeItems([aNewer, c], read.items);
+  assert.equal(merged.added, 1); // b
+  assert.equal(merged.updated, 0); // the phone's a is newer, so it stays
+  assert.equal(merged.items.find((i) => i.id === 'a')!.title, 'Edited after the backup');
+  assert.equal(merged.items.length, 3);
+  // Restoring the same file again changes nothing.
+  assert.deepEqual(mergeItems(merged.items, read.items), { items: merged.items, added: 0, updated: 0 });
+});
+
+test('readBackup rejects files that are not backups, and skips broken items', () => {
+  assert.throws(() => readBackup('not json'), /not a Shibal backup/);
+  assert.throws(() => readBackup('{"kind":"something-else","items":[]}'), /not a Shibal backup/);
+  assert.throws(() => readBackup('{"kind":"shibal-backup","format":9,"items":[]}'), /newer Shibal/);
+  const ok = readBackup(JSON.stringify({ kind: 'shibal-backup', format: 1, items: [item({ id: 'x' }), { id: 'broken' }], images: { x: { ext: '../../etc', base64: 'A' } } }));
+  assert.equal(ok.items.length, 1);
+  assert.deepEqual(ok.images, {});
+});
+
+test('restoring skips an item whose link is already saved under another id', () => {
+  const mine = item({ id: 'mine', url: 'https://www.x.org/apply?utm_source=ig' });
+  const theirs = item({ id: 'theirs', url: 'https://x.org/apply' });
+  assert.equal(mergeItems([mine], [theirs]).added, 0);
 });

@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { File } from 'expo-file-system';
-import { canSelfUpdate, downloadUpdate, findUpdate, installedVersion, openInstaller, type UpdateInfo } from './updates';
+import { canSelfUpdate, downloadUpdate, findUpdate, installedSigning, installedVersion, openInstaller, type UpdateInfo } from './updates';
 
 export type UpdatePhase = 'idle' | 'checking' | 'latest' | 'available' | 'downloading' | 'ready' | 'error';
 
@@ -15,6 +15,11 @@ interface UpdaterValue {
   current: string;
   /** The Home banner was closed for this version. */
   dismissed: boolean;
+  /**
+   * The update is signed with Shibal's private key but this copy has the public debug key, so
+   * Android won't install it over this one: it needs back up, uninstall, install, restore.
+   */
+  needsReinstall: boolean;
   check: () => Promise<void>;
   /** Downloads if needed, then opens Android's installer. */
   install: () => Promise<void>;
@@ -125,6 +130,7 @@ export function UpdaterProvider({ children }: { children: React.ReactNode }) {
       error,
       current: installedVersion(),
       dismissed: !!info && dismissedVersion === info.version,
+      needsReinstall: !!info && info.newSigningKey && installedSigning() === 'debug',
       check,
       install,
       dismiss,

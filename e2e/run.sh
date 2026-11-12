@@ -95,6 +95,11 @@ share_file e2e/fixtures/whatsapp-chat.zip application/zip
 app_log zip
 maestro test --format junit --output "$OUT/share-zip.xml" --test-output-dir "$OUT/share-zip" e2e/flows/share-zip.yaml
 
+step "Restore a backup through Android's file picker"
+adb push e2e/fixtures/shibal-backup.json /sdcard/Download/shibal-e2e-backup.json > /dev/null
+adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/shibal-e2e-backup.json > /dev/null || true
+maestro test --format junit --output "$OUT/restore.xml" --test-output-dir "$OUT/restore" e2e/flows/restore.yaml
+
 step "Update from inside the app: banner, download, Android installer"
 maestro test --format junit --output "$OUT/update.xml" --test-output-dir "$OUT/update" e2e/flows/update.yaml
 

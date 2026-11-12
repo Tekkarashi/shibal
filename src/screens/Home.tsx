@@ -190,7 +190,7 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
           </View>
           <View style={{ flex: 1 }}>
             <T v="bodyStrong">Shibal {updater.info!.version} is ready</T>
-            <T v="small">See what’s new and update in a minute.</T>
+            <T v="small">{updater.needsReinstall ? 'A one-time reinstall to Shibal’s own signing key. Nothing is lost.' : 'See what’s new and update in a minute.'}</T>
           </View>
           <IconButton icon="x" label="Not now" size={36} onPress={updater.dismiss} />
         </Tap>

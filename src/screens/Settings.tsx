@@ -5,6 +5,7 @@ import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import * as Haptics from 'expo-haptics';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { pickBackup, shareBackup } from '../backup';
 import { useApp } from '../context';
 import { useConfirm } from '../dialog';
 import { pickWhatsAppExport } from '../importFile';
@@ -147,6 +148,42 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
     });
   };
 
+  const backUp = async () => {
+    if (store.items.length === 0) {
+      toast({ message: 'Nothing to back up yet', icon: 'save' });
+      return;
+    }
+    try {
+      await shareBackup(store.items);
+    } catch {
+      toast({ message: 'Could not make the backup file', icon: 'alert-circle' });
+    }
+  };
+
+  const restore = async () => {
+    const res = await pickBackup();
+    if ('cancelled' in res) return;
+    if ('error' in res) {
+      toast({ message: res.error, icon: 'alert-circle' });
+      return;
+    }
+    const when = res.exportedAt ? new Date(res.exportedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    const ok = await confirm({
+      title: `Restore ${res.items.length} item${res.items.length === 1 ? '' : 's'}?`,
+      message: `${when ? `From a backup made ${when}. ` : ''}Nothing you have now is removed. Reminders are set again for restored items.`,
+      confirm: 'Restore',
+      cancel: 'Cancel',
+      icon: 'upload',
+    });
+    if (!ok) return;
+    const { added, updated } = store.restoreItems(res.items);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    toast({
+      message: added + updated === 0 ? 'Everything in that backup is already here' : `Restored: ${added} added${updated ? `, ${updated} updated` : ''}`,
+      icon: 'check-circle',
+    });
+  };
+
   const importChat = async () => {
     const res = await pickWhatsAppExport();
     if ('raw' in res) navigation.push('import', { raw: res.raw });
@@ -224,6 +261,25 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
             title="Morning summary"
             body="8 AM on days when something is due within 3 days. Mondays also nudge you about links without a date."
             right={toggle(settings.digest, (v) => updateSettings({ digest: v }), 'Morning summary')}
+          />
+        </Card>
+
+        <SectionLabel>Your data</SectionLabel>
+        <Card>
+          <Row
+            icon="save"
+            title="Back up to a file"
+            body="Saves every item, with its flyer, to a file you keep: Google Drive, Files, or a WhatsApp chat with yourself."
+            onPress={backUp}
+            right={<Icon name="chevron-right" size={18} color={c.faint} />}
+          />
+          <Divider inset={62} />
+          <Row
+            icon="upload"
+            title="Restore from a backup"
+            body="Adds what’s in a backup file. Items you already have stay; where both have one, the newer edit wins."
+            onPress={restore}
+            right={<Icon name="chevron-right" size={18} color={c.faint} />}
           />
         </Card>
 

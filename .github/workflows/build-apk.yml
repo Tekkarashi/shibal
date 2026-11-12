@@ -45,6 +45,31 @@ jobs:
           npm run typecheck
           npm test
 
+      # Shibal's private signing key, from the repository secrets. Pull requests from forks
+      # don't get secrets, so they build with the public debug key.
+      - name: Use Shibal's release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.SHIBAL_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SHIBAL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SHIBAL_KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/shibal-release.p12"
+            {
+              echo "SHIBAL_KEYSTORE=$RUNNER_TEMP/shibal-release.p12"
+              echo "SHIBAL_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "SHIBAL_KEY_ALIAS=$KEY_ALIAS"
+            } >> "$GITHUB_ENV"
+            echo "Signing with Shibal's release key."
+          else
+            echo "No release key configured: building with the public debug key."
+            # From 0.2.0 every release must carry the private key, or installs can't update.
+            if [[ "$GITHUB_REF" == refs/tags/v* ]] && node -e "const [a,b]=require('./package.json').version.split('.').map(Number);process.exit(a>0||b>=2?0:1)"; then
+              echo "::error::Releases from 0.2.0 must be signed with Shibal's release key. Add the SHIBAL_KEYSTORE_* secrets."
+              exit 1
+            fi
+          fi
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
         env:
@@ -54,6 +79,11 @@ jobs:
         working-directory: android
         # Cheaper Android Go devices still run 32-bit, so both ARM flavours go in.
         run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Show who signed the APK
+        run: |
+          APKSIGNER=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | grep -E "Signer #1 certificate (DN|SHA-256)"
 
       - name: Name the APK
         id: apk
@@ -94,6 +124,31 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - run: npm ci
+
+      # Shibal's private signing key, from the repository secrets. Pull requests from forks
+      # don't get secrets, so they build with the public debug key.
+      - name: Use Shibal's release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.SHIBAL_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SHIBAL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SHIBAL_KEY_ALIAS }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/shibal-release.p12"
+            {
+              echo "SHIBAL_KEYSTORE=$RUNNER_TEMP/shibal-release.p12"
+              echo "SHIBAL_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+              echo "SHIBAL_KEY_ALIAS=$KEY_ALIAS"
+            } >> "$GITHUB_ENV"
+            echo "Signing with Shibal's release key."
+          else
+            echo "No release key configured: building with the public debug key."
+            # From 0.2.0 every release must carry the private key, or installs can't update.
+            if [[ "$GITHUB_REF" == refs/tags/v* ]] && node -e "const [a,b]=require('./package.json').version.split('.').map(Number);process.exit(a>0||b>=2?0:1)"; then
+              echo "::error::Releases from 0.2.0 must be signed with Shibal's release key. Add the SHIBAL_KEYSTORE_* secrets."
+              exit 1
+            fi
+          fi
 
       - name: Pretend to be an old version, so the in-app update check finds one
         run: node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.version='0.0.1';fs.writeFileSync('app.json',JSON.stringify(a,null,2))"
@@ -152,6 +207,8 @@ jobs:
 
       # release-notes/<tag>.md is the "what's new" the app shows in Settings → App update.
       - name: Write the release notes
+        env:
+          KEYSTORE_B64: ${{ secrets.SHIBAL_KEYSTORE_B64 }}
         run: |
           {
             if [ -f "release-notes/${GITHUB_REF_NAME}.md" ]; then cat "release-notes/${GITHUB_REF_NAME}.md"; echo; fi
@@ -162,6 +219,7 @@ jobs:
             echo '3. Open Shibal, allow notifications, then Settings → **Send a test** to check reminders reach you.'
             echo
             echo 'Already have Shibal? It offers this update itself in Settings → App update. Your saved items stay.'
+            if [ -n "$KEYSTORE_B64" ]; then echo; echo '<!-- shibal-signing: release -->'; fi
           } > notes.md
 
       - name: Publish the release

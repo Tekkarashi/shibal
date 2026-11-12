@@ -654,3 +654,98 @@ export function releaseNotesSummary(body: string, max = 600): string {
     .trim();
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
 }
+
+/* ------------------------------------------------------------------ */
+/* Backups                                                             */
+/* ------------------------------------------------------------------ */
+
+/** True for a well-formed saved item (used for storage and for backups from older versions). */
+export function isValidItem(x: unknown): x is Item {
+  if (!x || typeof x !== 'object') return false;
+  const i = x as Record<string, unknown>;
+  return (
+    typeof i.id === 'string' &&
+    typeof i.title === 'string' &&
+    (i.url === null || typeof i.url === 'string') &&
+    typeof i.notes === 'string' &&
+    (i.deadline === null || (typeof i.deadline === 'string' && !Number.isNaN(Date.parse(i.deadline)))) &&
+    (i.status === 'open' || i.status === 'applied' || i.status === 'skipped') &&
+    typeof i.createdAt === 'string' &&
+    typeof i.updatedAt === 'string' &&
+    (i.imageUri === undefined || i.imageUri === null || typeof i.imageUri === 'string')
+  );
+}
+
+export interface Backup {
+  kind: 'shibal-backup';
+  format: 1;
+  exportedAt: string;
+  appVersion: string;
+  /** Items as saved; `imageUri` is replaced by the key of its picture in `images`. */
+  items: Item[];
+  /** Attached pictures, base64, keyed by item id. */
+  images: Record<string, { ext: string; base64: string }>;
+}
+
+/** Builds the backup file's contents. `images` holds the pictures that could be read. */
+export function makeBackup(
+  items: Item[],
+  images: Record<string, { ext: string; base64: string }>,
+  now: Date,
+  appVersion: string,
+): Backup {
+  return {
+    kind: 'shibal-backup',
+    format: 1,
+    exportedAt: now.toISOString(),
+    appVersion,
+    items: items.map((i) => ({ ...i, imageUri: images[i.id] ? `backup-image:${i.id}` : null })),
+    images,
+  };
+}
+
+/** Reads a backup file. Throws an Error with a message for the user if it is not one. */
+export function readBackup(text: string): { items: Item[]; images: Backup['images']; exportedAt: string } {
+  let data: unknown;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error('That file is not a Shibal backup.');
+  }
+  const b = data as Partial<Backup>;
+  if (!b || b.kind !== 'shibal-backup' || !Array.isArray(b.items)) throw new Error('That file is not a Shibal backup.');
+  if (typeof b.format === 'number' && b.format > 1) throw new Error('This backup is from a newer Shibal. Update the app first.');
+  const items = b.items.filter(isValidItem).map((i) => ({ ...i, source: i.source ?? 'manual' }));
+  const images: Backup['images'] = {};
+  for (const [id, img] of Object.entries(b.images ?? {})) {
+    if (img && typeof img.base64 === 'string' && typeof img.ext === 'string' && /^[a-z0-9]{2,5}$/i.test(img.ext)) images[id] = img;
+  }
+  return { items, images, exportedAt: typeof b.exportedAt === 'string' ? b.exportedAt : '' };
+}
+
+/**
+ * Merges restored items into the current list without losing anything: new items are added,
+ * and where both have the same item the one edited more recently wins. An incoming item whose
+ * link is already saved under another id is skipped, so restoring twice never duplicates.
+ */
+export function mergeItems(existing: Item[], incoming: Item[]): { items: Item[]; added: number; updated: number } {
+  const byId = new Map(existing.map((i) => [i.id, i]));
+  const links = new Set(existing.filter((i) => i.url).map((i) => normalizeUrl(i.url!)));
+  let added = 0;
+  let updated = 0;
+  for (const inc of incoming) {
+    const mine = byId.get(inc.id);
+    if (mine) {
+      if (new Date(inc.updatedAt).getTime() > new Date(mine.updatedAt).getTime()) {
+        byId.set(inc.id, inc);
+        updated++;
+      }
+      continue;
+    }
+    if (inc.url && links.has(normalizeUrl(inc.url))) continue;
+    byId.set(inc.id, inc);
+    if (inc.url) links.add(normalizeUrl(inc.url));
+    added++;
+  }
+  return { items: [...byId.values()], added, updated };
+}

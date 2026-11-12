@@ -13,3 +13,5 @@ ios/
 .env.*
 npm-debug.*
 .DS_Store
+*.p12
+*.pfx

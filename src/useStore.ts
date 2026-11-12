@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { itemsFromImport, type ImportedLink } from './logic';
+import { itemsFromImport, mergeItems, type ImportedLink } from './logic';
 import { rescheduleAll } from './notifications';
 import { loadItems, loadSettings, saveItems, saveSettings } from './storage';
 import { DEFAULT_SETTINGS, type Draft, type Item, type Settings, type Status } from './types';
@@ -100,6 +100,16 @@ export function useStore() {
     [commit],
   );
 
+  /** Merges items from a backup: new ones are added, the more recent copy of each item wins. */
+  const restoreItems = useCallback(
+    (incoming: Item[]): { added: number; updated: number } => {
+      const merged = mergeItems(latest.current.items, incoming);
+      if (merged.added + merged.updated > 0) commit(merged.items);
+      return { added: merged.added, updated: merged.updated };
+    },
+    [commit],
+  );
+
   const importLinks = useCallback(
     (links: ImportedLink[]): { added: number; dated: number } => {
       const fresh = itemsFromImport(links, latest.current.items, new Date(), makeId);
@@ -114,7 +124,7 @@ export function useStore() {
     [commit],
   );
 
-  return { items, settings, loaded, addItem, updateItem, setStatus, removeItem, restoreItem, importLinks, updateSettings, replan };
+  return { items, settings, loaded, addItem, updateItem, setStatus, removeItem, restoreItem, restoreItems, importLinks, updateSettings, replan };
 }
 
 export type Store = ReturnType<typeof useStore>;
