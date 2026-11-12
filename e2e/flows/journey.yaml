@@ -3,11 +3,16 @@
 # button, delete + undo, and reminder health in Settings.
 appId: com.tekkarashi.shibal
 ---
-- launchApp:
-    clearState: true
-- extendedWaitUntil:
-    visible: "A quiet bank."
-    timeout: 30000
+# Freshly booted CI emulators sometimes have the launcher freeze and restart on top of the
+# app. If the home screen steals focus on this first launch, launch again.
+- retry:
+    maxRetries: 2
+    commands:
+      - launchApp:
+          clearState: true
+      - extendedWaitUntil:
+          visible: "A quiet bank."
+          timeout: 30000
 - takeScreenshot: 01-first-run
 
 # Save a new opportunity using Android's own date picker

@@ -15,7 +15,7 @@ step "Install"
 # ANR/crash dialogs (crashes are still captured from the log) and let the launcher settle.
 adb shell settings put global hide_error_dialogs 1 || true
 adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS > /dev/null || true
-sleep 15
+sleep 30
 adb install -r "$APK"
 # Grant up front so the system permission sheet does not cover the first screen.
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS
