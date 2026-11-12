@@ -74,8 +74,15 @@ appId: com.tekkarashi.shibal
 - assertVisible: "Team of 3"
 - tapOn:
     id: "save-top"
+# The short "Saved" toast can fade before the screen settles, so check what was stored instead.
 - extendedWaitUntil:
-    visible: "Saved"
+    visible: "Next up: Zecathon Hackathon.*"
+    timeout: 5000
+- tapOn: "Next up: Zecathon Hackathon.*"
+- assertVisible: "Team of 3"
+- back
+- extendedWaitUntil:
+    visible: "Next up: Zecathon Hackathon.*"
     timeout: 5000
 
 # Delete, then Undo
