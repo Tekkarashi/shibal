@@ -63,16 +63,32 @@ media_uri() {
   return 1
 }
 
+# Prints the app's own log lines and any crash since the last clear, so a failure shows its cause.
+app_log() {
+  local name="$1"
+  adb logcat -d -v time > "$OUT/logcat-$name.txt" || true
+  echo "  --- crash buffer ---"
+  adb logcat -d -b crash | tail -40 || true
+  echo "  --- app log ---"
+  grep -E "ReactNativeJS|ExpoShareIntent|expo-share-intent|AndroidRuntime|$PKG" "$OUT/logcat-$name.txt" | tail -40 || true
+}
+
 step "Share a flyer image, as WhatsApp does with a forwarded poster"
 img=$(media_uri e2e/fixtures/flyer.jpg /sdcard/Pictures/shibal-e2e-flyer.jpg images/media) || { echo "FAIL: flyer not indexed"; exit 1; }
 echo "  $img"
+adb logcat -c || true
 adb shell "am start -a android.intent.action.SEND -t image/jpeg --eu android.intent.extra.STREAM $img --grant-read-uri-permission $PKG"
+sleep 4
+app_log image
 maestro test --format junit --output "$OUT/share-image.xml" --test-output-dir "$OUT/share-image" e2e/flows/share-image.yaml
 
 step "Share a WhatsApp 'Export chat' zip"
 zip=$(media_uri e2e/fixtures/whatsapp-chat.zip /sdcard/Download/shibal-e2e-chat.zip file) || { echo "FAIL: zip not indexed"; exit 1; }
 echo "  $zip"
+adb logcat -c || true
 adb shell "am start -a android.intent.action.SEND -t application/zip --eu android.intent.extra.STREAM $zip --grant-read-uri-permission $PKG"
+sleep 4
+app_log zip
 maestro test --format junit --output "$OUT/share-zip.xml" --test-output-dir "$OUT/share-zip" e2e/flows/share-zip.yaml
 
 step "All end-to-end checks passed"
