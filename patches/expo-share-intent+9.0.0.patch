@@ -1,0 +1,65 @@
+diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+index ff5b100..090adff 100644
+--- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
++++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
+@@ -66,13 +66,25 @@ class ExpoShareIntentModule : Module() {
+                     "filePath" to instance?.getAbsolutePath(uri),
+                 )
+             }
+-            val queryResult: Cursor = resolver.query(uri, null, null, null, null)!!
+-            queryResult.moveToFirst()
+-            val fileName = queryResult.getString(queryResult.getColumnIndex(OpenableColumns.DISPLAY_NAME))
+-            val fileSize = queryResult.getString(queryResult.getColumnIndex(OpenableColumns.SIZE))
+-            queryResult.close()
++            var fileName: String? = null
++            var fileSize: String? = null
++            try {
++                resolver.query(uri, null, null, null, null)?.use { c ->
++                    if (c.moveToFirst()) {
++                        val nameIndex = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
++                        val sizeIndex = c.getColumnIndex(OpenableColumns.SIZE)
++                        if (nameIndex >= 0) fileName = c.getString(nameIndex)
++                        if (sizeIndex >= 0) fileSize = c.getString(sizeIndex)
++                    }
++                }
++            } catch (e: Exception) {
++                notifyError("cannot query file info for $uri: ${e.message}")
++            }
++            if (fileName == null) fileName = uri.lastPathSegment
+ 
+-            val mimeType = resolver.getType(uri)!!
++            val mimeType = try { resolver.getType(uri) } catch (e: Exception) { null }
++                ?: instance?.currentActivity?.intent?.type
++                ?: "application/octet-stream"
+ 
+             var mediaWidth: String? = null;
+             var mediaHeight: String? = null;
+@@ -81,9 +93,13 @@ class ExpoShareIntentModule : Module() {
+                 val options = BitmapFactory.Options().apply {
+                     inJustDecodeBounds = true
+                 }
+-                BitmapFactory.decodeStream(resolver.openInputStream(uri), null, options)
+-                mediaHeight = options.outHeight.toString()
+-                mediaWidth = options.outWidth.toString()
++                try {
++                    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
++                    mediaHeight = options.outHeight.toString()
++                    mediaWidth = options.outWidth.toString()
++                } catch (e: Exception) {
++                    notifyError("cannot read image size for $uri: ${e.message}")
++                }
+             }
+             if (mimeType.startsWith("video/")) {
+                 val retriever = MediaMetadataRetriever()
+@@ -122,7 +138,10 @@ class ExpoShareIntentModule : Module() {
+                 return
+             }
+             if (intent.type == null) return
+-            if (intent.type!!.startsWith("text/plain")) {
++            val streamOnly = intent.action == Intent.ACTION_SEND &&
++                intent.getStringExtra(Intent.EXTRA_TEXT) == null &&
++                intent.parcelable<Uri>(Intent.EXTRA_STREAM) != null
++            if (intent.type!!.startsWith("text/plain") && !streamOnly) {
+                 // text / urls
+                 if (intent.action == Intent.ACTION_SEND) {
+                     notifyShareIntent(mapOf(

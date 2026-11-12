@@ -44,6 +44,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "@types/react": "~19.3.0",
+    "patch-package": "^8.0.0",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3"
   },
@@ -55,7 +56,8 @@
     "prebuild": "expo prebuild --platform android --no-install",
     "web": "expo start --web --port 8082",
     "build:dev": "eas build --profile development --platform android",
-    "build:preview": "eas build --profile preview --platform android"
+    "build:preview": "eas build --profile preview --platform android",
+    "postinstall": "patch-package"
   },
   "license": "MIT",
   "description": "Save opportunity links with deadlines and get reminders you cannot miss."
