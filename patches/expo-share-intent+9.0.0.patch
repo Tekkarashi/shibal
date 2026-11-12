@@ -1,8 +1,39 @@
 diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-index ff5b100..090adff 100644
+index ff5b100..6bda6dd 100644
 --- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
 +++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-@@ -66,13 +66,25 @@ class ExpoShareIntentModule : Module() {
+@@ -55,6 +55,30 @@ class ExpoShareIntentModule : Module() {
+             instance!!.sendEvent("onError", mapOf("value" to message))
+         }
+ 
++        /**
++         * Copies whatever was shared into cacheDir/shared and returns that path. Android lets the
++         * receiving app read what it was handed (content:// grant or its own file), so this works
++         * for every sender, unlike returning the sender's original file path.
++         */
++        private fun copyToCache(uri: Uri, mimeType: String?, fileName: String?): String? {
++            val ctx = instance?.currentActivity ?: return null
++            return try {
++                val ext = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
++                    ?: fileName?.substringAfterLast('.', "")?.takeIf { it.isNotEmpty() }
++                    ?: "bin"
++                val safeName = fileName?.let { File(it).name }?.takeIf { it.isNotBlank() && it.contains('.') }
++                    ?: "shared.$ext"
++                val dir = File(ctx.cacheDir, "shared").apply { mkdirs() }
++                val target = File(dir, "${Date().time}_$safeName")
++                val input = ctx.contentResolver.openInputStream(uri) ?: return null
++                input.use { stream -> FileOutputStream(target).use { out -> stream.copyTo(out) } }
++                target.path
++            } catch (e: Exception) {
++                notifyError("cannot copy shared file ${uri}: ${e.message}")
++                null
++            }
++        }
++
+         @SuppressLint("Range")
+         private fun getFileInfo(uri: Uri): Map<String, String?> {
+             val resolver: ContentResolver? = instance?.currentActivity?.contentResolver
+@@ -66,13 +90,25 @@ class ExpoShareIntentModule : Module() {
                      "filePath" to instance?.getAbsolutePath(uri),
                  )
              }
@@ -34,7 +65,7 @@ index ff5b100..090adff 100644
  
              var mediaWidth: String? = null;
              var mediaHeight: String? = null;
-@@ -81,9 +93,13 @@ class ExpoShareIntentModule : Module() {
+@@ -81,9 +117,13 @@ class ExpoShareIntentModule : Module() {
                  val options = BitmapFactory.Options().apply {
                      inJustDecodeBounds = true
                  }
@@ -51,7 +82,18 @@ index ff5b100..090adff 100644
              }
              if (mimeType.startsWith("video/")) {
                  val retriever = MediaMetadataRetriever()
-@@ -122,7 +138,10 @@ class ExpoShareIntentModule : Module() {
+@@ -101,7 +141,9 @@ class ExpoShareIntentModule : Module() {
+ 
+             return mapOf(
+                     "contentUri" to uri.toString(),
+-                    "filePath" to instance?.getAbsolutePath(uri),
++                    // A copy in the app's cache is readable by every JS file API; an original
++                    // path (from a file manager or a file:// share) often is not.
++                    "filePath" to (copyToCache(uri, mimeType, fileName) ?: instance?.getAbsolutePath(uri)),
+                     "fileName" to fileName,
+                     "fileSize" to fileSize,
+                     "mimeType" to mimeType,
+@@ -122,7 +164,10 @@ class ExpoShareIntentModule : Module() {
                  return
              }
              if (intent.type == null) return
