@@ -1,0 +1,19 @@
+# After e2e/run.sh shares a WhatsApp "Export chat" zip (what newer WhatsApp
+# versions produce, even "Without media"): the links come out of it.
+appId: com.tekkarashi.shibal
+---
+- extendedWaitUntil:
+    visible: "Import from WhatsApp"
+    timeout: 20000
+- assertVisible: "Found 2 in this chat.*"
+- tapOn: "Everything"
+- assertVisible: "2 new links"
+- takeScreenshot: 12-whatsapp-zip-import
+- tapOn: "Import 2 links"
+- scrollUntilVisible:
+    element:
+      text: "Google Africa Developer Scholarship.*"
+- scrollUntilVisible:
+    element:
+      text: "Commonwealth Shared Scholarship"
+- takeScreenshot: 13-imported-links

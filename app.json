@@ -11,7 +11,9 @@
       "versionCode": 2,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#141210"
+        "backgroundImage": "./assets/adaptive-icon-background.png",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png",
+        "backgroundColor": "#C47D59"
       },
       "permissions": [
         "POST_NOTIFICATIONS",
@@ -27,6 +29,12 @@
       ]
     },
     "plugins": [
+      [
+        "./plugins/withShareTargets",
+        {
+          "label": "Save to Shibal"
+        }
+      ],
       [
         "expo-share-intent",
         {
@@ -47,12 +55,12 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/adaptive-icon.png",
-          "imageWidth": 220,
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 132,
           "resizeMode": "contain",
           "backgroundColor": "#F5F0E8",
           "dark": {
-            "image": "./assets/adaptive-icon.png",
+            "image": "./assets/splash-icon.png",
             "backgroundColor": "#12100E"
           }
         }

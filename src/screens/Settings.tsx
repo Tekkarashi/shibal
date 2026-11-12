@@ -220,7 +220,7 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
           <Row
             icon="message-circle"
             title="Import from WhatsApp"
-            body="In your chat with yourself: ⋮ → More → Export chat → Without media. Share the file to Shibal, or pick it here."
+            body="In your chat with yourself: ⋮ → More → Export chat → Without media, then pick “Save to Shibal”. Or pick the file here."
             onPress={importChat}
             right={<Icon name="chevron-right" size={18} color={c.faint} />}
           />

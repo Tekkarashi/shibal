@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { Fraunces_600SemiBold, Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
+import { cleanupAttachments, keepSharedImage } from './src/attachments';
 import { AppProvider, useApp } from './src/context';
 import { draftFromShared, normalizeUrl, parseWhatsAppExport } from './src/logic';
 import { navRef, type RootStack } from './src/nav';
@@ -23,6 +24,7 @@ import ItemForm from './src/screens/ItemForm';
 import Settings from './src/screens/Settings';
 import { useTheme } from './src/theme';
 import { useNotificationTap } from './src/useNotificationTap';
+import { chatTextFromZip, looksLikeZip } from './src/zip';
 import './src/webPreview';
 
 // Keep the branded splash up until fonts and saved items are ready, then fade it out.
@@ -46,6 +48,7 @@ function Effects({ navReady }: { navReady: boolean }) {
     if (!store.loaded || ready.current) return;
     ready.current = true;
     (async () => {
+      cleanupAttachments(store.items.map((i) => i.imageUri));
       await setupNotifications();
       await askNotificationPermission();
       await checkHealth();
@@ -67,13 +70,37 @@ function Effects({ navReady }: { navReady: boolean }) {
     if (!hasShareIntent || !store.loaded || !navReady) return;
     (async () => {
       const file = shareIntent.files?.[0];
+      const name = file?.fileName ?? file?.path ?? '';
+      const mime = file?.mimeType ?? '';
       let text = shareIntent.text ?? '';
+      let imageUri: string | null = null;
 
-      if (file && (file.mimeType?.startsWith('text/') || /\.txt$/i.test(file.fileName ?? file.path ?? ''))) {
+      if (file && (/zip/i.test(mime) || /\.zip$/i.test(name))) {
+        // WhatsApp "Export chat" on newer versions: a zip with _chat.txt inside.
+        let raw: string | null = null;
+        try {
+          const bytes = await new File(file.path).bytes();
+          raw = looksLikeZip(bytes) ? chatTextFromZip(bytes) : null;
+        } catch {
+          raw = null;
+        }
+        if (raw && parseWhatsAppExport(raw).length > 0) navRef.dispatch(StackActions.push('import', { raw }));
+        else toast({ message: 'No WhatsApp chat with links in that zip', icon: 'alert-circle' });
+        return;
+      }
+
+      if (file && (mime.startsWith('text/') || /\.txt$/i.test(name))) {
         try {
           text = await new File(file.path).text();
         } catch {
           text = '';
+        }
+      } else if (file && (mime.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name))) {
+        // A flyer or screenshot. Keep a copy with the item; any caption that came with it is the text.
+        imageUri = await keepSharedImage(file.path, mime, file.fileName);
+        if (!imageUri) {
+          toast({ message: 'Could not read that image', icon: 'alert-circle' });
+          return;
         }
       }
 
@@ -82,7 +109,7 @@ function Effects({ navReady }: { navReady: boolean }) {
         return;
       }
 
-      if (!text.trim() && !shareIntent.webUrl) {
+      if (!text.trim() && !shareIntent.webUrl && !imageUri) {
         toast({ message: 'That share had no text or link to save', icon: 'alert-circle' });
         return;
       }
@@ -93,6 +120,11 @@ function Effects({ navReady }: { navReady: boolean }) {
         source: 'share',
         now: new Date(),
       });
+      if (imageUri) {
+        draft.imageUri = imageUri;
+        // With no caption there is nothing to read a title from; leave it for the user to type.
+        if (!text.trim() && !shareIntent.webUrl) draft.title = '';
+      }
       const dup = draft.url ? store.items.find((i) => i.url && normalizeUrl(i.url) === normalizeUrl(draft.url!)) : undefined;
       navRef.dispatch(StackActions.push('form', dup ? { id: dup.id, notice: 'You already saved this link.' } : { draft }));
     })()

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
+import { Image, Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -364,6 +364,11 @@ function ItemCard({
           )}
         </View>
       </View>
+      {item.imageUri ? (
+        <View style={{ justifyContent: 'center', paddingRight: item.url && !done ? 0 : SPACE.md }}>
+          <Image source={{ uri: item.imageUri }} style={s.thumb} accessibilityIgnoresInvertColors />
+        </View>
+      ) : null}
       {item.url && !done ? (
         <View style={{ justifyContent: 'center', paddingRight: SPACE.sm }}>
           <IconButton icon="arrow-up-right" label={`Open ${domainOf(item.url) || 'link'}`} onPress={() => !swiping() && onLink(item.url!)} tone="accent" size={40} />
@@ -377,7 +382,7 @@ function Empty({ onAdd, onImport }: { onAdd: () => void; onImport: () => void })
   const s = useStyles();
   const { c } = useTheme();
   const steps: { icon: 'share-2' | 'calendar' | 'bell'; title: string; body: string }[] = [
-    { icon: 'share-2', title: 'Share it here', body: 'From Instagram, X, Chrome or anywhere, tap Share and pick Shibal.' },
+    { icon: 'share-2', title: 'Share it here', body: 'From WhatsApp, Instagram, TikTok, X or Chrome, tap Share and pick “Save to Shibal”. Flyers work too.' },
     { icon: 'calendar', title: 'Set the deadline', body: 'Shibal spots dates in the text. Check it and save.' },
     { icon: 'bell', title: 'Get nudged in time', body: 'A week, three days, a day, and hours before it closes.' },
   ];
@@ -443,6 +448,7 @@ const useStyles = makeStyles(({ c, dark }) => ({
     borderColor: c.line,
     overflow: 'hidden',
   },
+  thumb: { width: 48, height: 48, borderRadius: RADIUS.sm, backgroundColor: c.sunken, marginLeft: SPACE.xs },
   stripe: { width: 4, borderRadius: 2, marginVertical: SPACE.lg, marginLeft: SPACE.md },
   doneToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACE.lg, marginTop: SPACE.sm },
   step: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md + 2, marginBottom: SPACE.lg },

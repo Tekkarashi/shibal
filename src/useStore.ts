@@ -58,6 +58,7 @@ export function useStore() {
         url: draft.url,
         notes: draft.notes,
         deadline: draft.deadline,
+        imageUri: draft.imageUri ?? null,
         status: 'open',
         source: draft.source,
         createdAt: now,
@@ -70,7 +71,7 @@ export function useStore() {
   );
 
   const updateItem = useCallback(
-    (id: string, patch: Partial<Pick<Item, 'title' | 'url' | 'notes' | 'deadline'>>) => {
+    (id: string, patch: Partial<Pick<Item, 'title' | 'url' | 'notes' | 'deadline' | 'imageUri'>>) => {
       const now = new Date().toISOString();
       commit(latest.current.items.map((i) => (i.id === id ? { ...i, ...patch, updatedAt: now } : i)));
     },

@@ -12,6 +12,8 @@ export interface Item {
   source: Source;
   createdAt: string;
   updatedAt: string;
+  /** A flyer or screenshot shared with the item, stored inside the app. */
+  imageUri?: string | null;
 }
 
 export interface Settings {
@@ -32,4 +34,5 @@ export interface Draft {
   source: Source;
   /** The piece of text the deadline was guessed from, shown so the user can check it. */
   guessedFrom?: string;
+  imageUri?: string | null;
 }

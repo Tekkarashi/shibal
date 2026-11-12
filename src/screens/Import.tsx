@@ -52,7 +52,7 @@ export default function Import({ navigation, route }: ScreenProps<'import'>) {
               No links in this file
             </T>
             <T v="body" color="muted" style={{ marginTop: SPACE.sm, textAlign: 'center' }}>
-              Check you exported the right chat, and pick “Without media” so WhatsApp makes a text file.
+              Check you exported the right chat. Shibal reads the .txt or .zip that WhatsApp makes.
             </T>
           </View>
         ) : (

@@ -23,7 +23,7 @@ To update, install the newer APK over the old one. Your saved items stay.
 
 ## Using it
 
-**Save.** In Instagram, X, Chrome, Telegram or any app with a Share button, tap Share and choose Shibal. The title and link are filled in for you. If the text mentions a date such as "Deadline: 30 November", it is picked up and shown so you can check it. Set a deadline and save.
+**Save.** In WhatsApp, Instagram, TikTok, X, Chrome, Telegram or any app with a Share button, tap Share and choose **Save to Shibal**. Shared flyers and screenshots are kept with the item. The title and link are filled in for you. If the text mentions a date such as "Deadline: 30 November", it is picked up and shown so you can check it. Set a deadline and save.
 
 **Sort.** The home screen leads with what closes next and a countdown, then groups the rest by urgency: missed, due today, next 3 days, this week, later, and links that still need a deadline. Swipe a card right when you have applied, left to skip it. Every change can be undone from the toast that follows.
 
@@ -33,7 +33,7 @@ To update, install the newer APK over the old one. Your saved items stay.
 
 ## Move your links out of WhatsApp
 
-In your chat with yourself: three dots, More, Export chat, **Without media**. Share the file to Shibal, or pick it under Settings. You choose how far back to import. Links arrive under "Needs a deadline", and a deadline is filled in only when the message says something like "deadline" or "closes" next to a date.
+In your chat with yourself: three dots, More, Export chat, **Without media**, then pick **Save to Shibal**. Newer WhatsApp versions make a .zip and older ones a .txt; Shibal reads both. You can also pick the file under Settings. You choose how far back to import. Links arrive under "Needs a deadline", and a deadline is filled in only when the message says something like "deadline" or "closes" next to a date.
 
 ## Reminders on Tecno, Infinix and itel phones
 

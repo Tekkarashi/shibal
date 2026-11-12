@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Platform, ScrollView, TextInput, View, type TextInputInstance } from 'react-native';
+import { Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, type TextInputInstance } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -45,7 +45,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const initial: Draft = useMemo(
     () =>
       editingItem
-        ? { title: editingItem.title, url: editingItem.url, notes: editingItem.notes, deadline: editingItem.deadline, source: editingItem.source }
+        ? { title: editingItem.title, url: editingItem.url, notes: editingItem.notes, deadline: editingItem.deadline, source: editingItem.source, imageUri: editingItem.imageUri ?? null }
         : route.params?.draft ?? BLANK,
     // Only the first render's values matter; later store changes must not reset the form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -55,6 +55,8 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const [title, setTitle] = useState(initial.title);
   const [url, setUrl] = useState(initial.url ?? '');
   const [notes, setNotes] = useState(initial.notes);
+  const [imageUri, setImageUri] = useState<string | null>(initial.imageUri ?? null);
+  const [viewing, setViewing] = useState(false);
   const [deadline, setDeadline] = useState<Date | null>(initial.deadline ? new Date(initial.deadline) : null);
   const [guessNote, setGuessNote] = useState<string | undefined>(initial.guessedFrom);
   const [focus, setFocus] = useState<'title' | 'url' | 'notes' | null>(null);
@@ -67,6 +69,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
     title !== initial.title ||
     (finalUrl ?? '') !== (initial.url ?? '') ||
     notes !== initial.notes ||
+    imageUri !== (initial.imageUri ?? null) ||
     (deadline?.toISOString() ?? null) !== initial.deadline;
 
   // Android sizes a multiline input to its text by itself. In the browser the box only ever grows,
@@ -173,10 +176,11 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
       notes,
       deadline: deadline ? deadline.toISOString() : null,
       source: initial.source,
+      imageUri,
     };
     const doSave = () => {
       if (editingItem) {
-        store.updateItem(editingItem.id, { title: draft.title, url: draft.url, notes: draft.notes, deadline: draft.deadline });
+        store.updateItem(editingItem.id, { title: draft.title, url: draft.url, notes: draft.notes, deadline: draft.deadline, imageUri });
         finish('Saved');
       } else {
         store.addItem(draft);
@@ -217,7 +221,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const setStatus = (status: 'applied' | 'skipped' | 'open') => {
     if (!editingItem) return;
     const before = editingItem.status;
-    if (dirty) store.updateItem(editingItem.id, { title: title.trim() || editingItem.title, url: finalUrl, notes, deadline: deadline?.toISOString() ?? null });
+    if (dirty) store.updateItem(editingItem.id, { title: title.trim() || editingItem.title, url: finalUrl, notes, deadline: deadline?.toISOString() ?? null, imageUri });
     store.setStatus(editingItem.id, status);
     leaving.current = true;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
@@ -280,6 +284,25 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           autoFocus={!editing && !initial.title}
           accessibilityLabel="Title"
         />
+
+        {imageUri ? (
+          <View style={s.flyer}>
+            <Tap onPress={() => setViewing(true)} accessibilityRole="imagebutton" accessibilityLabel="Attached image. Opens full screen." testID="attached-image">
+              <Image source={{ uri: imageUri }} style={s.flyerImage} resizeMode="cover" />
+            </Tap>
+            <View style={s.flyerBar}>
+              <Icon name="image" size={15} color={c.muted} />
+              <T v="caption" style={{ flex: 1, marginLeft: SPACE.sm }}>
+                Shared image, kept with this item
+              </T>
+              <Tap onPress={() => setImageUri(null)} accessibilityRole="button" accessibilityLabel="Remove the image" hitSlop={10}>
+                <T v="caption" style={{ color: c.danger, fontFamily: F.bold }}>
+                  Remove
+                </T>
+              </Tap>
+            </View>
+          </View>
+        ) : null}
 
         {/* Deadline */}
         <View style={s.deadlineCard}>
@@ -408,6 +431,14 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           </View>
         ) : null}
       </KeyboardAwareScrollView>
+
+      {imageUri ? (
+        <Modal visible={viewing} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setViewing(false)}>
+          <Pressable style={s.viewer} onPress={() => setViewing(false)} accessibilityLabel="Close image">
+            <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+          </Pressable>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -476,4 +507,8 @@ const useStyles = makeStyles(({ c }) => ({
     color: c.ink,
   },
   manage: { marginTop: SPACE.xxl, paddingTop: SPACE.xl, borderTopWidth: 1, borderTopColor: c.line },
+  flyer: { borderRadius: RADIUS.xl, borderWidth: 1, borderColor: c.line, backgroundColor: c.surface, overflow: 'hidden', marginBottom: SPACE.lg },
+  flyerImage: { width: '100%', aspectRatio: 4 / 3, backgroundColor: c.sunken },
+  flyerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.lg, paddingVertical: SPACE.md },
+  viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' },
 }));

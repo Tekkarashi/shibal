@@ -1,0 +1,22 @@
+# After e2e/run.sh shares e2e/fixtures/flyer.jpg the way WhatsApp shares a
+# forwarded poster: the image arrives attached, the user names it and saves.
+appId: com.tekkarashi.shibal
+---
+- extendedWaitUntil:
+    visible: "New opportunity"
+    timeout: 20000
+- assertVisible:
+    id: "attached-image"
+- assertVisible: "Shared image, kept with this item"
+- takeScreenshot: 10-flyer-shared
+- tapOn:
+    id: "title-input"
+- inputText: "Mastercard Scholars Program"
+- hideKeyboard
+- tapOn: "In 2 weeks"
+- tapOn:
+    id: "save-top"
+- scrollUntilVisible:
+    element:
+      text: "Mastercard Scholars Program"
+- takeScreenshot: 11-flyer-on-home

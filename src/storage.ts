@@ -15,7 +15,8 @@ function isItem(x: unknown): x is Item {
     (i.deadline === null || (typeof i.deadline === 'string' && !Number.isNaN(Date.parse(i.deadline)))) &&
     (i.status === 'open' || i.status === 'applied' || i.status === 'skipped') &&
     typeof i.createdAt === 'string' &&
-    typeof i.updatedAt === 'string'
+    typeof i.updatedAt === 'string' &&
+    (i.imageUri === undefined || i.imageUri === null || typeof i.imageUri === 'string')
   );
 }
 
