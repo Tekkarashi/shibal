@@ -99,6 +99,8 @@ jobs:
         run: npx expo prebuild --platform android --no-install
         env:
           CI: '1'
+          # Test build only: lets the app read files the emulator pushes (plugins/withE2eFileAccess.js).
+          SHIBAL_E2E: '1'
 
       - name: Build release APK for the emulator
         working-directory: android

@@ -64,7 +64,8 @@
             "backgroundColor": "#12100E"
           }
         }
-      ]
+      ],
+      "./plugins/withE2eFileAccess"
     ],
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F5F0E8"

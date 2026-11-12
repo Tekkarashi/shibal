@@ -20,6 +20,8 @@ adb install -r "$APK"
 # Grant up front so the system permission sheet does not cover the first screen.
 adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS
 adb shell appops set "$PKG" SCHEDULE_EXACT_ALARM allow || true
+# Test build only: read files the shell pushes, standing in for a sender's share grant.
+adb shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow || true
 
 step "Journey: save, applied + undo, discard guard, delete + undo, settings"
 maestro test --format junit --output "$OUT/journey.xml" --test-output-dir "$OUT/journey" e2e/flows/journey.yaml
@@ -54,10 +56,9 @@ for type in text/plain image/jpeg image/png application/zip; do
 done
 if adb shell dumpsys package "$PKG" | grep -q 'label="Save to Shibal"'; then echo '  labelled "Save to Shibal"'; fi
 
-# Hands a file to Shibal the way a sending app with access would. The emulator's shell may not
-# grant access to gallery (MediaStore) items, so the file goes in Shibal's own shared-storage
-# folder, which the app can always read, and is shared by its file:// address.
-APP_FILES=/sdcard/Android/data/$PKG/files
+# Hands a file to Shibal the way a sending app would. The test build may read shared storage
+# (plugins/withE2eFileAccess.js); on a phone the sender grants access to what it shares.
+APP_FILES=/sdcard/Download
 share_file() {
   local src="$1" mime="$2" name dest
   name=$(basename "$src")
