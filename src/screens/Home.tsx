@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { Alert, Linking, Platform, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -17,8 +17,8 @@ import {
   type BucketKey,
 } from '../logic';
 import type { ScreenProps } from '../nav';
-import { SwipeRow, useSwipeGuard } from '../SwipeRow';
-import { F, makeStyles, RADIUS, SPACE, useTheme, type Palette } from '../theme';
+import { SwipeRow, useSwipeA11y, useSwipeGuard } from '../SwipeRow';
+import { F, makeStyles, NO_OUTLINE, RADIUS, SPACE, useTheme, type Palette } from '../theme';
 import { useToast } from '../toast';
 import type { Item, Status } from '../types';
 import { Button, Icon, IconButton, Pill, SectionLabel, T, Tap } from '../ui';
@@ -56,6 +56,15 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
   const toast = useToast();
   const [showDone, setShowDone] = useState(false);
   const [query, setQuery] = useState<string | null>(null);
+  const searchRef = useRef<TextInputInstance>(null);
+  const searchOpen = query !== null;
+
+  // autoFocus alone loses to the button that was just tapped, so focus once the box has mounted.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = setTimeout(() => searchRef.current?.focus(), 60);
+    return () => clearTimeout(id);
+  }, [searchOpen]);
 
   const q = query?.trim().toLowerCase() ?? '';
   const visible = useMemo(
@@ -128,12 +137,12 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
         <Animated.View entering={HERO_IN} style={s.search}>
           <Icon name="search" size={18} color={c.muted} />
           <TextInput
-            autoFocus
+            ref={searchRef}
             value={query}
             onChangeText={setQuery}
             placeholder="Search titles, links, notes"
             placeholderTextColor={c.faint}
-            style={s.searchInput}
+            style={[s.searchInput, NO_OUTLINE]}
             returnKeyType="search"
             accessibilityLabel="Search saved items"
           />
@@ -217,7 +226,8 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
     );
   };
 
-  const hasOpen = store.items.some((i) => i.status === 'open');
+  // Only when a swipeable card is on screen (the Next up card is not one).
+  const hasOpen = rows.some((r) => r.kind === 'item' && r.bucket !== 'done');
 
   return (
     <View style={s.screen}>
@@ -317,12 +327,13 @@ function ItemCard({
   const s = useStyles();
   const { c } = useTheme();
   const swiping = useSwipeGuard();
+  const swipeActions = useSwipeA11y();
   const done = bucket === 'done';
   const meta = [domainOf(item.url), item.source === 'whatsapp' ? 'from WhatsApp' : null].filter(Boolean).join(' · ') || 'No link';
   const pillTone = bucket === 'overdue' ? 'danger' : bucket === 'today' || bucket === 'soon' ? 'accent' : 'neutral';
 
   return (
-    <Tap onPress={() => !swiping() && onPress()} accessibilityRole="button" accessibilityLabel={item.title} innerStyle={[s.card, done && { opacity: 0.72 }]}>
+    <Tap onPress={() => !swiping() && onPress()} accessibilityRole="button" accessibilityLabel={item.title} accessibilityHint={done ? undefined : 'Opens it. Actions menu: mark applied or skip.'} {...swipeActions} innerStyle={[s.card, done && { opacity: 0.72 }]}>
       <View style={[s.stripe, { backgroundColor: tone(bucket, c) }]} />
       <View style={{ flex: 1, paddingVertical: SPACE.lg, paddingLeft: SPACE.md + 2, paddingRight: SPACE.sm }}>
         <T v="headline" numberOfLines={2} style={done ? { textDecorationLine: 'line-through', color: c.muted } : undefined}>

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Platform, ScrollView, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as Clipboard from 'expo-clipboard';
@@ -9,7 +10,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import { useApp } from '../context';
 import { addDays, atTime, endOfDay, extractUrls, startOfDay, timeLeft } from '../logic';
 import type { ScreenProps } from '../nav';
-import { F, makeStyles, RADIUS, SPACE, useTheme } from '../theme';
+import { F, makeStyles, NO_OUTLINE, RADIUS, SPACE, useTheme } from '../theme';
 import { useToast } from '../toast';
 import type { Draft } from '../types';
 import { Button, Chip, Icon, Pill, T, Tap, TopBar } from '../ui';
@@ -55,6 +56,8 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const [notes, setNotes] = useState(initial.notes);
   const [deadline, setDeadline] = useState<Date | null>(initial.deadline ? new Date(initial.deadline) : null);
   const [guessNote, setGuessNote] = useState<string | undefined>(initial.guessedFrom);
+  const [focus, setFocus] = useState<'title' | 'url' | 'notes' | null>(null);
+  const [titleHeight, setTitleHeight] = useState<number | null>(null);
   const leaving = useRef(false);
 
   const finalUrl = cleanUrl(url);
@@ -231,7 +234,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         backIcon="x"
         right={<Button kind="primary" small label="Save" onPress={save} />}
       />
-      <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAwareScrollView bottomOffset={28} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {route.params?.notice ? (
           <Animated.View entering={FadeIn.duration(200)} style={s.notice}>
             <Icon name="info" size={16} color={c.accent} />
@@ -242,12 +245,25 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         ) : null}
 
         <TextInput
-          style={s.titleInput}
+          style={[s.titleInput, NO_OUTLINE, focus === 'title' && { borderBottomColor: c.accent }, titleHeight ? { height: titleHeight } : null]}
           value={title}
           onChangeText={setTitle}
+          onFocus={() => setFocus('title')}
+          onBlur={() => setFocus(null)}
           placeholder="What’s the opportunity?"
           placeholderTextColor={c.faint}
           multiline
+          // Android grows a multiline input with its text on its own; the browser preview is sized from its content.
+          {...(Platform.OS === 'web' ? { rows: 1 } : null)}
+          onContentSizeChange={
+            Platform.OS === 'web'
+              ? (e) => {
+                  // The browser reports scrollHeight, which already includes padding; add only the 2px underline.
+                  const next = Math.ceil(e.nativeEvent.contentSize.height) + 2;
+                  setTitleHeight((h) => (h !== null && Math.abs(h - next) <= 2 ? h : next));
+                }
+              : undefined
+          }
           autoFocus={!editing && !initial.title}
           accessibilityLabel="Title"
         />
@@ -311,12 +327,14 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         <T v="label" style={s.fieldLabel}>
           Link
         </T>
-        <View style={s.field}>
-          <Icon name="link-2" size={18} color={c.muted} />
+        <View style={[s.field, focus === 'url' && s.fieldFocused]}>
+          <Icon name="link-2" size={18} color={focus === 'url' ? c.accent : c.muted} />
           <TextInput
-            style={s.fieldInput}
+            style={[s.fieldInput, NO_OUTLINE]}
             value={url}
             onChangeText={setUrl}
+            onFocus={() => setFocus('url')}
+            onBlur={() => setFocus(null)}
             placeholder="Paste or type a link"
             placeholderTextColor={c.faint}
             autoCapitalize="none"
@@ -344,9 +362,11 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           Notes
         </T>
         <TextInput
-          style={[s.field, s.notes]}
+          style={[s.field, s.notes, NO_OUTLINE, focus === 'notes' && s.fieldFocused]}
           value={notes}
           onChangeText={setNotes}
+          onFocus={() => setFocus('notes')}
+          onBlur={() => setFocus(null)}
           placeholder="What it asks for, who to ask, anything you’ll need later"
           placeholderTextColor={c.faint}
           multiline
@@ -372,7 +392,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
             <Button kind="danger" icon="trash-2" label="Delete" onPress={confirmDelete} style={{ marginTop: SPACE.sm }} />
           </View>
         ) : null}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }
@@ -394,9 +414,13 @@ const useStyles = makeStyles(({ c }) => ({
     lineHeight: 35,
     letterSpacing: -0.4,
     color: c.ink,
-    paddingVertical: SPACE.sm,
-    marginBottom: SPACE.lg,
+    paddingTop: SPACE.sm,
+    paddingBottom: SPACE.md,
+    marginBottom: SPACE.xl,
+    borderBottomWidth: 2,
+    borderBottomColor: c.line,
   },
+  fieldFocused: { borderColor: c.accent },
   deadlineCard: {
     backgroundColor: c.surface,
     borderRadius: RADIUS.xl,

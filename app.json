@@ -6,7 +6,6 @@
     "orientation": "portrait",
     "scheme": "shibal",
     "icon": "./assets/icon.png",
-    "newArchEnabled": true,
     "android": {
       "package": "com.tekkarashi.shibal",
       "versionCode": 1,
@@ -44,7 +43,20 @@
           "color": "#C07B58"
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/adaptive-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#F5F0E8",
+          "dark": {
+            "image": "./assets/adaptive-icon.png",
+            "backgroundColor": "#12100E"
+          }
+        }
+      ]
     ],
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#F5F0E8"

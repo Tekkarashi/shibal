@@ -33,6 +33,17 @@ const THRESHOLD = 92;
 const SwipeGuard = createContext<() => boolean>(() => false);
 export const useSwipeGuard = () => useContext(SwipeGuard);
 
+/**
+ * Screen readers cannot swipe, so the card offers the same actions through
+ * the accessibility actions menu. Spread these onto the card's pressable.
+ */
+type A11yActions = {
+  accessibilityActions?: { name: string; label: string }[];
+  onAccessibilityAction?: (e: { nativeEvent: { actionName: string } }) => void;
+};
+const SwipeA11y = createContext<A11yActions>({});
+export const useSwipeA11y = () => useContext(SwipeA11y);
+
 /** Where a flick would come to rest if it kept decelerating (Apple's decay form). */
 function project(velocity: number, rate = 0.998) {
   'worklet';
@@ -75,6 +86,19 @@ export function SwipeRow({
   const dragging = useRef(false);
   const endedAt = useRef(0);
   const guard = useMemo(() => () => dragging.current || Date.now() - endedAt.current < 400, []);
+  const a11y = useMemo<A11yActions>(
+    () => ({
+      accessibilityActions: [
+        ...(left ? [{ name: 'left', label: left.label }] : []),
+        ...(right ? [{ name: 'right', label: right.label }] : []),
+      ],
+      onAccessibilityAction: (e) => {
+        const side = e.nativeEvent.actionName;
+        if (side === 'left' || side === 'right') onCommit(side);
+      },
+    }),
+    [left, right, onCommit],
+  );
   const dragStart = () => {
     dragging.current = true;
   };
@@ -150,7 +174,7 @@ export function SwipeRow({
   return (
     <View onLayout={onLayout}>
       {left ? (
-        <Animated.View style={[styles.under, { backgroundColor: left.bg, justifyContent: 'flex-start' }, leftStyle]}>
+        <Animated.View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden aria-hidden style={[styles.under, { backgroundColor: left.bg, justifyContent: 'flex-start' }, leftStyle]}>
           <Animated.View style={[styles.action, leftIcon]}>
             <Feather name={left.icon} size={20} color={left.fg} />
             <Text style={[styles.label, { color: left.fg }]}>{left.label}</Text>
@@ -158,7 +182,7 @@ export function SwipeRow({
         </Animated.View>
       ) : null}
       {right ? (
-        <Animated.View style={[styles.under, { backgroundColor: right.bg, justifyContent: 'flex-end' }, rightStyle]}>
+        <Animated.View importantForAccessibility="no-hide-descendants" accessibilityElementsHidden aria-hidden style={[styles.under, { backgroundColor: right.bg, justifyContent: 'flex-end' }, rightStyle]}>
           <Animated.View style={[styles.action, rightIcon]}>
             <Text style={[styles.label, { color: right.fg }]}>{right.label}</Text>
             <Feather name={right.icon} size={20} color={right.fg} />
@@ -167,7 +191,9 @@ export function SwipeRow({
       ) : null}
       <GestureDetector gesture={pan}>
         <Animated.View style={cardStyle}>
-          <SwipeGuard.Provider value={guard}>{children}</SwipeGuard.Provider>
+          <SwipeGuard.Provider value={guard}>
+            <SwipeA11y.Provider value={a11y}>{children}</SwipeA11y.Provider>
+          </SwipeGuard.Provider>
         </Animated.View>
       </GestureDetector>
     </View>

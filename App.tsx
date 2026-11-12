@@ -3,10 +3,12 @@ import { Alert, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, StackActions, type Theme as NavTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { File } from 'expo-file-system';
 import { useFonts } from 'expo-font';
 import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { Fraunces_600SemiBold, Fraunces_600SemiBold_Italic } from '@expo-google-fonts/fraunces';
@@ -21,6 +23,11 @@ import ItemForm from './src/screens/ItemForm';
 import Settings from './src/screens/Settings';
 import { useTheme } from './src/theme';
 import { useNotificationTap } from './src/useNotificationTap';
+import './src/webPreview';
+
+// Keep the branded splash up until fonts and saved items are ready, then fade it out.
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
+SplashScreen.setOptions({ fade: true, duration: 220 });
 import { ToastProvider } from './src/toast';
 
 const Stack = createNativeStackNavigator<RootStack>();
@@ -122,6 +129,10 @@ function Navigator() {
     colors: { ...base.colors, background: t.c.bg, card: t.c.bg, text: t.c.ink, border: t.c.line, primary: t.c.accent },
   };
 
+  useEffect(() => {
+    if (store.loaded) SplashScreen.hideAsync().catch(() => undefined);
+  }, [store.loaded]);
+
   if (!store.loaded) return <View style={{ flex: 1, backgroundColor: t.c.bg }} />;
 
   return (
@@ -153,11 +164,13 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1, backgroundColor: t.c.bg }}>
       <SafeAreaProvider>
+        <KeyboardProvider>
         <ShareIntentProvider>
           <AppProvider>
             <ToastProvider>{fontsLoaded || fontError ? <Navigator /> : <View style={{ flex: 1, backgroundColor: t.c.bg }} />}</ToastProvider>
           </AppProvider>
         </ShareIntentProvider>
+        </KeyboardProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

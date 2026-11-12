@@ -1,4 +1,4 @@
-import { StyleSheet, useColorScheme, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, useColorScheme, type ImageStyle, type TextStyle, type ViewStyle } from 'react-native';
 import { cubicBezier, Easing } from 'react-native-reanimated';
 
 /**
@@ -131,3 +131,9 @@ export const PRESS_TRANSITION = {
   transitionDuration: '120ms' as const,
   transitionTimingFunction: cubicBezier(0.23, 1, 0.32, 1),
 };
+
+/**
+ * Browsers draw their own focus outline around inputs; the app shows focus with
+ * its own border colour instead. No effect on Android.
+ */
+export const NO_OUTLINE = (Platform.OS === 'web' ? { outlineStyle: 'none', outlineWidth: 0 } : {}) as object;

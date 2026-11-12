@@ -100,10 +100,10 @@ export function useStore() {
   );
 
   const importLinks = useCallback(
-    (links: ImportedLink[]): number => {
+    (links: ImportedLink[]): { added: number; dated: number } => {
       const fresh = itemsFromImport(links, latest.current.items, new Date(), makeId);
       if (fresh.length > 0) commit([...fresh, ...latest.current.items]);
-      return fresh.length;
+      return { added: fresh.length, dated: fresh.filter((i) => i.deadline).length };
     },
     [commit],
   );

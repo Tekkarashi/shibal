@@ -30,9 +30,12 @@ export default function Import({ navigation, route }: ScreenProps<'import'>) {
   }, [all, range, known, now]);
 
   const run = () => {
-    const n = store.importLinks(picked);
+    const { added, dated } = store.importLinks(picked);
+    const undated = added - dated;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    toast({ message: `${n} link${n === 1 ? '' : 's'} added under “Needs a deadline”`, icon: 'download' });
+    const detail =
+      dated === 0 ? 'under “Needs a deadline”' : undated === 0 ? 'with deadlines' : `: ${dated} with a deadline, ${undated} need one`;
+    toast({ message: `${added} link${added === 1 ? '' : 's'} added ${detail}`.replace(' :', ':'), icon: 'download' });
     navigation.goBack();
   };
 
@@ -56,8 +59,8 @@ export default function Import({ navigation, route }: ScreenProps<'import'>) {
           <>
             <T v="display">{picked.length} new link{picked.length === 1 ? '' : 's'}</T>
             <T v="body" color="muted" style={{ marginTop: SPACE.xs }}>
-              Found {all.length} in this chat. They land under “Needs a deadline”. A date is filled in only when the message says something
-              like “deadline 30 November”.
+              Found {all.length} in this chat. Most land under “Needs a deadline”. A date is filled in only when the message says something like
+              “deadline 30 November” and that date is still ahead.
             </T>
 
             <T v="label" style={{ marginTop: SPACE.xxl, marginBottom: SPACE.sm }}>
