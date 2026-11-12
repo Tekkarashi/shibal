@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
-import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../context';
@@ -29,7 +29,8 @@ type Row =
   | { kind: 'doneToggle'; key: string; count: number };
 
 const REFLOW = LinearTransition.duration(220);
-const HERO_IN = FadeIn.duration(240);
+// No entrance animation on the hero or search box: they re-mount often (search toggles, Undo), and with
+// system animations off a fade-in could stall at zero opacity, leaving an invisible but tappable card.
 
 function tone(bucket: BucketKey, c: Palette): string {
   switch (bucket) {
@@ -135,7 +136,7 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
       </View>
 
       {query !== null ? (
-        <Animated.View entering={HERO_IN} style={s.search}>
+        <View style={s.search}>
           <Icon name="search" size={18} color={c.muted} />
           <TextInput
             ref={searchRef}
@@ -147,7 +148,7 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
             returnKeyType="search"
             accessibilityLabel="Search saved items"
           />
-        </Animated.View>
+        </View>
       ) : (
         <View style={{ marginTop: SPACE.lg }}>
           <T v="label" style={{ marginBottom: SPACE.sm }}>
@@ -276,7 +277,7 @@ function Hero({ item, now, onOpen, onLink, onApplied }: { item: Item; now: Date;
   const cd = countdown(item.deadline!, now);
   const urgent = new Date(item.deadline!).getTime() - now.getTime() < 3 * 86_400_000;
   return (
-    <Animated.View entering={HERO_IN} style={{ marginTop: SPACE.xl }}>
+    <View style={{ marginTop: SPACE.xl }}>
       <Tap onPress={onOpen} accessibilityRole="button" accessibilityLabel={`Next up: ${item.title}, ${cd.value} ${cd.unit}`} innerStyle={s.hero}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View style={[s.heroDot, { backgroundColor: urgent ? c.accent : c.onHeroSoft }]} />
@@ -306,7 +307,7 @@ function Hero({ item, now, onOpen, onLink, onApplied }: { item: Item; now: Date;
           <Button small icon="check" label="I applied" onPress={onApplied} kind="secondary" />
         </View>
       </Tap>
-    </Animated.View>
+    </View>
   );
 }
 

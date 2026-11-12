@@ -1,6 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, ScrollView, TextInput, View, type TextInputInstance } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -258,12 +257,12 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
       />
       <KeyboardAwareScrollView bottomOffset={28} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {route.params?.notice ? (
-          <Animated.View entering={FadeIn.duration(200)} style={s.notice}>
+          <View style={s.notice}>
             <Icon name="info" size={16} color={c.accent} />
             <T v="bodyStrong" style={{ flex: 1, marginLeft: SPACE.sm }}>
               {route.params.notice}
             </T>
-          </Animated.View>
+          </View>
         ) : null}
 
         <TextInput
