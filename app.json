@@ -2,13 +2,13 @@
   "expo": {
     "name": "Shibal",
     "slug": "shibal",
-    "version": "0.1.2",
+    "version": "0.1.3",
     "orientation": "portrait",
     "scheme": "shibal",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.tekkarashi.shibal",
-      "versionCode": 3,
+      "versionCode": 4,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundImage": "./assets/adaptive-icon-background.png",
