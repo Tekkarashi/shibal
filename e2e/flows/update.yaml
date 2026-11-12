@@ -1,0 +1,29 @@
+# The e2e build reports version 0.0.1, so the latest GitHub release is an update.
+# Expects: the Home banner, the update card in Settings, a real download of the APK,
+# and Android's package installer asking to confirm. The test cancels there.
+appId: com.tekkarashi.shibal
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: "update-banner"
+    timeout: 30000
+- takeScreenshot: 14-update-banner
+- tapOn:
+    id: "update-banner"
+- extendedWaitUntil:
+    visible: "Version [0-9.]+ is ready"
+    timeout: 10000
+- takeScreenshot: 15-update-card
+- tapOn:
+    id: "update-install"
+# Downloading ~45 MB, then Android's installer opens over Shibal.
+- extendedWaitUntil:
+    visible: ".*(update|install) this app.*"
+    timeout: 180000
+- takeScreenshot: 16-android-installer
+- back
+- extendedWaitUntil:
+    visible: "Install update"
+    timeout: 15000

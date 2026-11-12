@@ -32,6 +32,7 @@ SplashScreen.preventAutoHideAsync().catch(() => undefined);
 SplashScreen.setOptions({ fade: true, duration: 220 });
 import { DialogProvider } from './src/dialog';
 import { ToastProvider, useToast } from './src/toast';
+import { UpdaterProvider } from './src/updater';
 
 const Stack = createNativeStackNavigator<RootStack>();
 
@@ -215,9 +216,11 @@ export default function App() {
         <KeyboardProvider>
         <ShareIntentProvider>
           <AppProvider>
+          <UpdaterProvider>
             <ToastProvider>
               <DialogProvider>{fontsLoaded || fontError ? <Navigator /> : <View style={{ flex: 1, backgroundColor: t.c.bg }} />}</DialogProvider>
             </ToastProvider>
+          </UpdaterProvider>
           </AppProvider>
         </ShareIntentProvider>
         </KeyboardProvider>

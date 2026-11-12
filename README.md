@@ -19,7 +19,7 @@ Everything is stored on your phone. Nothing is uploaded and there is no account.
 3. Open Shibal and allow notifications when asked.
 4. Go to Settings and tap **Send a test**. Swipe the app away and lock the phone. If the reminder arrives, you are set.
 
-To update, install the newer APK over the old one. Your saved items stay.
+**Updates:** Shibal checks for new versions itself (at most every 6 hours, only while you use it). When one is out, a banner on the home screen takes you to Settings → App update, which downloads it and opens Android's installer: tap Update and your saved items and reminders stay. The first time, Android asks you to allow Shibal to install apps.
 
 ## Using it
 

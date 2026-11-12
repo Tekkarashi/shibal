@@ -118,6 +118,10 @@ appId: com.tekkarashi.shibal
     timeout: 10000
 - assertVisible: "[1-9][0-9]* reminders? scheduled on this phone\\."
 - takeScreenshot: 06-settings-health
+# An update offer may sit above, so bring the button into view first.
+- scrollUntilVisible:
+    element:
+      text: "Send a test"
 - tapOn: "Send a test"
 - extendedWaitUntil:
     visible: "Test set for 1 minute"

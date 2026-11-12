@@ -12,6 +12,8 @@ import type { ScreenProps } from '../nav';
 import { askExactAlarmPermission, askNotificationPermission, getHealth, scheduledCount, scheduleTest, type Health } from '../notifications';
 import { makeStyles, RADIUS, SPACE, useTheme } from '../theme';
 import { useToast } from '../toast';
+import { UpdatesCard } from '../UpdatesCard';
+import { useUpdater } from '../updater';
 import { Button, Card, Divider, Icon, Pill, SectionLabel, T, Tap, TopBar, type IconName } from '../ui';
 
 function brandTip(): string {
@@ -71,6 +73,9 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
   const { c } = useTheme();
   const s = useStyles();
   const toast = useToast();
+  const updater = useUpdater();
+  // An update waiting to be installed goes to the top; otherwise the card sits near the bottom.
+  const updateFirst = !!updater.info && ['available', 'downloading', 'ready'].includes(updater.phase);
   const confirm = useConfirm();
   const [health, setHealth] = useState<Health | null>(null);
   const [count, setCount] = useState(0);
@@ -185,6 +190,13 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
           </View>
         </View>
 
+        {updateFirst ? (
+          <>
+            <SectionLabel>App update</SectionLabel>
+            <UpdatesCard />
+          </>
+        ) : null}
+
         <SectionLabel>Reminder health</SectionLabel>
         <Card>
           <Row icon="bell" title="Notifications" body="Needed for every reminder." right={status(health?.notifications, fixNotifications)} />
@@ -225,6 +237,13 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
             right={<Icon name="chevron-right" size={18} color={c.faint} />}
           />
         </Card>
+
+        {!updateFirst ? (
+          <>
+            <SectionLabel>App updates</SectionLabel>
+            <UpdatesCard />
+          </>
+        ) : null}
 
         <View style={s.about}>
           <T style={s.wordmark}>Shibal</T>

@@ -95,6 +95,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Pretend to be an old version, so the in-app update check finds one
+        run: node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.version='0.0.1';fs.writeFileSync('app.json',JSON.stringify(a,null,2))"
+
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
         env:
@@ -140,21 +143,30 @@ jobs:
     needs: [apk, e2e]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: Shibal-apk
           path: dist
 
+      # release-notes/<tag>.md is the "what's new" the app shows in Settings → App update.
+      - name: Write the release notes
+        run: |
+          {
+            if [ -f "release-notes/${GITHUB_REF_NAME}.md" ]; then cat "release-notes/${GITHUB_REF_NAME}.md"; echo; fi
+            echo '## Install on Android'
+            echo
+            echo '1. Download **Shibal.apk** below on your phone (Android 7 or newer).'
+            echo '2. Open it. Android asks to allow installs from your browser: allow it for this install.'
+            echo '3. Open Shibal, allow notifications, then Settings → **Send a test** to check reminders reach you.'
+            echo
+            echo 'Already have Shibal? It offers this update itself in Settings → App update. Your saved items stay.'
+          } > notes.md
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.apk
+          body_path: notes.md
           generate_release_notes: true
-          body: |
-            ## Install on Android
-
-            1. Download **Shibal.apk** below on your phone (Android 7 or newer).
-            2. Open it. Android asks to allow installs from your browser: allow it for this install.
-            3. Open Shibal, allow notifications, then Settings → **Send a test** to check reminders reach you.
-
-            Updating? Install the new APK over the old one. Your saved items stay.

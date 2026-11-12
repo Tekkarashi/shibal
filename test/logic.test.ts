@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   bucketOf, groupItems, buildLadder, buildDigests, parseDeadline, parseWhatsAppExport,
   itemsFromImport, formatDeadline, timeLeft, extractUrls, normalizeUrl, titleFrom, draftFromShared,
-  headline, countdown, nextUp,
+  headline, countdown, nextUp, isNewerVersion, releaseNotesSummary,
 } from '../src/logic';
 import type { Item } from '../src/types';
 
@@ -299,4 +299,21 @@ test('countdown and nextUp', () => {
 test('the deadline snippet starts and ends on whole words', () => {
   const g = parseDeadline('Chevening Scholarships 2027. Deadline: 22 November https://chevening.org/apply', NOW)!;
   assert.equal(g.snippet, '2027. Deadline: 22 November');
+});
+
+/* ---------------- app updates ---------------- */
+
+test('isNewerVersion compares numerically, not as text', () => {
+  assert.equal(isNewerVersion('v0.1.3', '0.1.2'), true);
+  assert.equal(isNewerVersion('0.1.10', '0.1.9'), true);
+  assert.equal(isNewerVersion('0.2', '0.1.9'), true);
+  assert.equal(isNewerVersion('0.1.2', '0.1.2'), false);
+  assert.equal(isNewerVersion('0.1.1', '0.1.2'), false);
+  assert.equal(isNewerVersion('1.0.0-beta', '0.9.9'), true);
+});
+
+test('releaseNotesSummary keeps what is new and drops install steps', () => {
+  const body = "## What's new\n\n- **Share flyers** from WhatsApp\n- New logo\n\n## Install on Android\n\n1. Download Shibal.apk";
+  assert.equal(releaseNotesSummary(body), "What's new\n\n• Share flyers from WhatsApp\n• New logo");
+  assert.equal(releaseNotesSummary('x'.repeat(700)).length, 600);
 });

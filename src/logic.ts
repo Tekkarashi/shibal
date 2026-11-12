@@ -612,3 +612,45 @@ export function nextUp(items: Item[], now: Date): Item | null {
   }
   return best;
 }
+
+/* ------------------------------------------------------------------ */
+/* App updates                                                         */
+/* ------------------------------------------------------------------ */
+
+/** "v0.1.10" → [0, 1, 10]. Anything after a hyphen (pre-release) is ignored. */
+export function parseVersion(v: string): number[] {
+  return v
+    .trim()
+    .replace(/^v/i, '')
+    .split('-')[0]
+    .split('.')
+    .map((n) => parseInt(n, 10) || 0);
+}
+
+/** True when `candidate` is a later version than `current` (0.1.10 is later than 0.1.9). */
+export function isNewerVersion(candidate: string, current: string): boolean {
+  const a = parseVersion(candidate);
+  const b = parseVersion(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
+
+/**
+ * The "what's new" part of a GitHub release body, as plain text for the app: everything
+ * before the install instructions, without markdown symbols, at most `max` characters.
+ */
+export function releaseNotesSummary(body: string, max = 600): string {
+  const cut = body.search(/^#+\s*(Install on Android|Full Changelog)/im);
+  const text = (cut >= 0 ? body.slice(0, cut) : body)
+    .replace(/\r/g, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/^[ \t]*[-*][ \t]+/gm, '• ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
+}

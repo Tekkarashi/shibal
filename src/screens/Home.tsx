@@ -4,6 +4,7 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApp } from '../context';
+import { useUpdater } from '../updater';
 import { pickWhatsAppExport } from '../importFile';
 import {
   BUCKET_TITLES,
@@ -55,6 +56,8 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
   const s = useStyles();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const updater = useUpdater();
+  const updateBanner = !!updater.info && !updater.dismissed && ['available', 'downloading', 'ready'].includes(updater.phase);
   const [showDone, setShowDone] = useState(false);
   const [query, setQuery] = useState<string | null>(null);
   const searchRef = useRef<TextInputInstance>(null);
@@ -177,6 +180,19 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
             </T>
           </View>
           <Icon name="chevron-right" size={20} color={c.danger} />
+        </Tap>
+      ) : null}
+
+      {updateBanner && query === null ? (
+        <Tap onPress={() => navigation.push('settings')} accessibilityRole="button" accessibilityLabel={`Shibal ${updater.info!.version} is ready. Opens the update.`} innerStyle={s.update} style={{ marginTop: SPACE.xl }} testID="update-banner">
+          <View style={s.updateIcon}>
+            <Icon name="download" size={18} color={c.onAccent} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <T v="bodyStrong">Shibal {updater.info!.version} is ready</T>
+            <T v="small">See what’s new and update in a minute.</T>
+          </View>
+          <IconButton icon="x" label="Not now" size={36} onPress={updater.dismiss} />
         </Tap>
       ) : null}
 
@@ -431,6 +447,8 @@ const useStyles = makeStyles(({ c, dark }) => ({
     borderRadius: RADIUS.lg,
     backgroundColor: c.dangerSoft,
   },
+  update: { flexDirection: 'row', alignItems: 'center', gap: SPACE.md, padding: SPACE.md + 2, paddingRight: SPACE.sm, borderRadius: RADIUS.lg, backgroundColor: c.accentSoft },
+  updateIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' },
   bannerIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
   hero: {
     backgroundColor: c.hero,

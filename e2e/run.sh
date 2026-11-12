@@ -22,6 +22,8 @@ adb shell pm grant "$PKG" android.permission.POST_NOTIFICATIONS
 adb shell appops set "$PKG" SCHEDULE_EXACT_ALARM allow || true
 # Test build only: read files the shell pushes, standing in for a sender's share grant.
 adb shell appops set "$PKG" MANAGE_EXTERNAL_STORAGE allow || true
+# Lets Shibal open the installer for its own update without the one-time settings detour.
+adb shell appops set "$PKG" REQUEST_INSTALL_PACKAGES allow || true
 
 step "Journey: save, applied + undo, discard guard, delete + undo, settings"
 maestro test --format junit --output "$OUT/journey.xml" --test-output-dir "$OUT/journey" e2e/flows/journey.yaml
@@ -92,5 +94,8 @@ step "Share a WhatsApp 'Export chat' zip"
 share_file e2e/fixtures/whatsapp-chat.zip application/zip
 app_log zip
 maestro test --format junit --output "$OUT/share-zip.xml" --test-output-dir "$OUT/share-zip" e2e/flows/share-zip.yaml
+
+step "Update from inside the app: banner, download, Android installer"
+maestro test --format junit --output "$OUT/update.xml" --test-output-dir "$OUT/update" e2e/flows/update.yaml
 
 step "All end-to-end checks passed"
