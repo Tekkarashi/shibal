@@ -35,6 +35,20 @@ import { ToastProvider, useToast } from './src/toast';
 
 const Stack = createNativeStackNavigator<RootStack>();
 
+/**
+ * Opens a screen for something that came from outside the app (a share, a reminder tap).
+ * It sits on top of home, so saving or going back lands where the item is, not on whatever
+ * screen happened to be open. A form being edited is kept underneath instead of discarded.
+ */
+function openFromOutside<K extends 'form' | 'import'>(name: K, params: RootStack[K]) {
+  if (!navRef.isReady()) return;
+  if (navRef.getCurrentRoute()?.name === 'form') {
+    navRef.dispatch(StackActions.push(name, params));
+  } else {
+    navRef.reset({ index: 1, routes: [{ name: 'home' }, { name, params }] });
+  }
+}
+
 /** Side effects that need the store and navigation: first-run setup, shares, notification taps. */
 function Effects({ navReady }: { navReady: boolean }) {
   const { store, checkHealth, now } = useApp();
@@ -84,7 +98,7 @@ function Effects({ navReady }: { navReady: boolean }) {
         } catch {
           raw = null;
         }
-        if (raw && parseWhatsAppExport(raw).length > 0) navRef.dispatch(StackActions.push('import', { raw }));
+        if (raw && parseWhatsAppExport(raw).length > 0) openFromOutside('import', { raw });
         else toast({ message: 'No WhatsApp chat with links in that zip', icon: 'alert-circle' });
         return;
       }
@@ -105,7 +119,7 @@ function Effects({ navReady }: { navReady: boolean }) {
       }
 
       if (text.includes('\n') && parseWhatsAppExport(text).length > 0) {
-        navRef.dispatch(StackActions.push('import', { raw: text }));
+        openFromOutside('import', { raw: text });
         return;
       }
 
@@ -126,7 +140,7 @@ function Effects({ navReady }: { navReady: boolean }) {
         if (!text.trim() && !shareIntent.webUrl) draft.title = '';
       }
       const dup = draft.url ? store.items.find((i) => i.url && normalizeUrl(i.url) === normalizeUrl(draft.url!)) : undefined;
-      navRef.dispatch(StackActions.push('form', dup ? { id: dup.id, notice: 'You already saved this link.' } : { draft }));
+      openFromOutside('form', dup ? { id: dup.id, notice: 'You already saved this link.' } : { draft });
     })()
       .catch((e) => console.warn('[share] could not handle the share', String(e)))
       .finally(() => resetShareIntent());
@@ -142,7 +156,7 @@ function Effects({ navReady }: { navReady: boolean }) {
     if (handled.current === stamp) return;
     handled.current = stamp;
     const id = response.notification.request.content.data?.itemId;
-    if (typeof id === 'string' && store.items.some((i) => i.id === id)) navRef.dispatch(StackActions.push('form', { id }));
+    if (typeof id === 'string' && store.items.some((i) => i.id === id)) openFromOutside('form', { id });
   }, [response, store.loaded, store.items, navReady]);
 
   return null;
