@@ -1,10 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
-import { EASE_OUT, F, RADIUS, SPACE, useTheme } from './theme';
-import { Tap, type IconName } from './ui';
+import { F, RADIUS, SPACE, useTheme } from './theme';
+import { Rise, Tap, type IconName } from './ui';
 
 interface ToastInput {
   message: string;
@@ -20,9 +19,6 @@ const ToastContext = createContext<(t: ToastInput) => void>(() => undefined);
 
 export const useToast = () => useContext(ToastContext);
 
-// Module scope: layout-animation builders are not rebuilt on every render.
-const ENTER = FadeInDown.duration(260).easing(EASE_OUT);
-const EXIT = FadeOutDown.duration(200).easing(EASE_OUT);
 
 /** One toast at a time, above the home indicator, with an optional Undo. */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -59,9 +55,7 @@ function ToastView({ toast, onClose }: { toast: ToastState; onClose: () => void 
   const insets = useSafeAreaInsets();
   const { c } = useTheme();
   return (
-    <Animated.View
-      entering={ENTER}
-      exiting={EXIT}
+    <Rise
       pointerEvents="box-none"
       style={{ position: 'absolute', left: SPACE.lg, right: SPACE.lg, bottom: insets.bottom + 96 }}
       accessibilityLiveRegion="polite"
@@ -99,6 +93,6 @@ function ToastView({ toast, onClose }: { toast: ToastState; onClose: () => void 
           </Tap>
         ) : null}
       </View>
-    </Animated.View>
+    </Rise>
   );
 }

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text, View, type PressableProps, type StyleProp, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import Feather from '@expo/vector-icons/Feather';
 import * as Haptics from 'expo-haptics';
-import { F, makeStyles, PRESS_TRANSITION, RADIUS, SPACE, useTheme, type Palette } from './theme';
+import { EASE_OUT, F, makeStyles, PRESS_TRANSITION, RADIUS, SPACE, useTheme, type Palette } from './theme';
 
 export type IconName = React.ComponentProps<typeof Feather>['name'];
 
@@ -299,5 +299,29 @@ export function SectionLabel({ children, right, color }: { children: React.React
       </T>
       {right}
     </View>
+  );
+}
+
+/**
+ * Slides its content up a few points as it appears. Only position animates, never
+ * opacity: on a phone with animations off a stalled fade can leave a toast or dialog
+ * invisible but tappable, while a stalled rise just leaves it a few points low.
+ */
+export function Rise({
+  children,
+  style,
+  distance = 16,
+  duration = 240,
+  ...rest
+}: React.ComponentProps<typeof Animated.View> & { distance?: number; duration?: number }) {
+  const y = useSharedValue(distance);
+  useEffect(() => {
+    y.set(withTiming(0, { duration, easing: EASE_OUT, reduceMotion: ReduceMotion.System }));
+  }, [y, duration]);
+  const rise = useAnimatedStyle(() => ({ transform: [{ translateY: y.get() }] }));
+  return (
+    <Animated.View {...rest} style={[style, rise]}>
+      {children}
+    </Animated.View>
   );
 }

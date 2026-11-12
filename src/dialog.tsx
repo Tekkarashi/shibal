@@ -1,9 +1,8 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { EASE_OUT, RADIUS, SPACE, useTheme } from './theme';
-import { Button, Icon, T, type IconName } from './ui';
+import { RADIUS, SPACE, useTheme } from './theme';
+import { Button, Icon, Rise, T, type IconName } from './ui';
 
 export interface ConfirmOptions {
   title: string;
@@ -22,11 +21,6 @@ const DialogContext = createContext<Ask>(async () => false);
 /** `await confirm({...})` resolves true when the main button is pressed. */
 export const useConfirm = () => useContext(DialogContext);
 
-// Module scope so the builders are not rebuilt per render. A short rise and fade, the same
-// built-in animation the toasts use (a custom keyframe never started in the browser preview).
-const CARD_IN = FadeInDown.duration(220).easing(EASE_OUT);
-const SCRIM_IN = FadeIn.duration(180);
-const OUT = FadeOut.duration(140);
 
 /**
  * In-app confirm dialogs. They look the same on every phone and in the browser
@@ -56,7 +50,7 @@ export function DialogProvider({ children }: { children: React.ReactNode }) {
   return (
     <DialogContext.Provider value={value}>
       {children}
-      <Modal visible={!!current} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={() => close(false)}>
+      <Modal visible={!!current} transparent animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => close(false)}>
         {current ? <DialogCard o={current} onClose={close} /> : null}
       </Modal>
     </DialogContext.Provider>
@@ -68,12 +62,12 @@ function DialogCard({ o, onClose }: { o: ConfirmOptions; onClose: (answer: boole
   const danger = o.tone === 'danger';
   return (
     <View style={styles.fill}>
-      <Animated.View entering={SCRIM_IN} exiting={OUT} style={[StyleSheet.absoluteFill, { backgroundColor: c.scrim }]}>
+      {/* The Modal fades in natively; the card only rises, so it can never be left invisible. */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: c.scrim }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => onClose(false)} accessibilityLabel="Close dialog" />
-      </Animated.View>
-      <Animated.View
-        entering={CARD_IN}
-        exiting={OUT}
+      </View>
+      <Rise
+        distance={12}
         accessibilityViewIsModal
         accessibilityRole="alert"
         style={[styles.card, { backgroundColor: c.raised, borderColor: c.line }]}
@@ -95,7 +89,7 @@ function DialogCard({ o, onClose }: { o: ConfirmOptions; onClose: (answer: boole
           {o.cancel ? <Button label={o.cancel} testID="dialog-cancel" onPress={() => onClose(false)} style={{ flex: 1 }} /> : null}
           <Button kind={danger ? 'danger' : 'primary'} label={o.confirm} testID="dialog-confirm" onPress={() => onClose(true)} style={{ flex: 1 }} />
         </View>
-      </Animated.View>
+      </Rise>
     </View>
   );
 }
