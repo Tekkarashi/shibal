@@ -1,6 +1,12 @@
 # Shibal
 
-A place to keep every application, fellowship, hackathon and opportunity you come across, sorted by how soon it closes, with reminders that reach you before it does.
+**Free Android app for deadlines.** A place to keep every application, fellowship, hackathon and opportunity you come across, sorted by how soon it closes, with reminders that reach you before it does.
+
+## Download Shibal
+
+**[⬇ Download Shibal for Android](https://tekkarashi.github.io/shibal/)**: the download page always has the newest version, install steps and every past release.
+
+Direct link to the latest APK: [Shibal.apk](https://github.com/Tekkarashi/shibal/releases/latest/download/Shibal.apk) · All versions: [Releases](https://github.com/Tekkarashi/shibal/releases)
 
 It exists because links saved in a WhatsApp chat with yourself, browser bookmarks and screenshots get buried, and the deadline passes while you are not looking. Shibal replaces the pile with one list that goes looking for you.
 
@@ -8,10 +14,12 @@ Everything is stored on your phone. Nothing is uploaded and there is no account.
 
 ## Install
 
-1. Open the [Releases](../../releases) page and download the latest `Shibal-vX.Y.Z.apk` on your phone. It needs Android 7 or newer.
+1. On your phone, open the [download page](https://tekkarashi.github.io/shibal/) and tap **Download Shibal**. It needs Android 7 or newer.
 2. Open the file. Android will ask you to allow installs from your browser or file manager. Allow it for this install.
 3. Open Shibal and allow notifications when asked.
-4. Go to Settings and tap **Send a test in 1 minute**. Swipe the app away and lock the phone. If the reminder arrives, you are set.
+4. Go to Settings and tap **Send a test**. Swipe the app away and lock the phone. If the reminder arrives, you are set.
+
+To update, install the newer APK over the old one. Your saved items stay.
 
 ## Using it
 
