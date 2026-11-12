@@ -315,6 +315,19 @@ function validDate(y: number, mo: number, d: number): boolean {
   return t.getFullYear() === y && t.getMonth() === mo && t.getDate() === d;
 }
 
+/**
+ * The words around a date, for showing the user where it was read from.
+ * About two words of context each side, widened to whole words so it never
+ * starts or ends mid-word ("…27. Deadline" instead of "2027. Deadline").
+ */
+export function snippetAround(text: string, start: number, end: number): string {
+  let from = Math.max(0, start - 14);
+  let to = Math.min(text.length, end + 8);
+  while (from > 0 && !/\s/.test(text[from - 1])) from--;
+  while (to < text.length && !/\s/.test(text[to])) to++;
+  return text.slice(from, to).replace(/\s+/g, ' ').trim();
+}
+
 function readTime(after: string): { h: number; m: number } | null {
   const head = after.slice(0, 40);
   const ampm = head.match(/(?:^|[^\d])(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m\b/i);
@@ -373,7 +386,7 @@ export function parseDeadline(rawText: string, now: Date, writtenAt?: Date): Dea
       end: m.index + m[0].length,
       date,
       explicitTime: readTime(text.slice(m.index + m[0].length)),
-      snippet: text.slice(Math.max(0, m.index - 14), Math.min(text.length, m.index + m[0].length + 8)).replace(/\s+/g, ' ').trim(),
+      snippet: snippetAround(text, m.index, m.index + m[0].length),
       confident,
     });
   };

@@ -295,3 +295,8 @@ test('countdown and nextUp', () => {
   assert.equal(nextUp([a, missed, b], NOW)?.id, 'b');
   assert.equal(nextUp([missed], NOW), null);
 });
+
+test('the deadline snippet starts and ends on whole words', () => {
+  const g = parseDeadline('Chevening Scholarships 2027. Deadline: 22 November https://chevening.org/apply', NOW)!;
+  assert.equal(g.snippet, '2027. Deadline: 22 November');
+});

@@ -88,12 +88,10 @@
   .meta strong { color: var(--ink-soft); }
   section { padding: 44px 0 0; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 24px; }
-  .hero-card { background: var(--hero); color: var(--on-hero); border-radius: 26px; padding: 26px; margin-top: 36px; }
-  .hero-card .label { font: 800 11px/1 Manrope, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--on-hero-soft); }
-  .hero-card .t { font: 600 24px/1.25 Fraunces, Georgia, serif; margin: 12px 0 16px; }
-  .count { display: flex; align-items: flex-end; gap: 10px; }
-  .count b { font: 600 64px/0.95 Fraunces, Georgia, serif; color: var(--accent); letter-spacing: -2px; }
-  .count span { font-weight: 700; padding-bottom: 6px; }
+  .shots { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 1fr); gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 36px -20px 0; padding: 4px 20px 12px; }
+  .shots figure { margin: 0; scroll-snap-align: center; }
+  .shots img { display: block; width: 100%; height: auto; border-radius: 22px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 10px 30px rgba(59,36,20,.12); }
+  .shots figcaption { font-size: 13px; color: var(--muted); text-align: center; margin-top: 10px; }
   ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 14px; }
   ol.steps li { counter-increment: s; display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; }
   ol.steps li::before { content: counter(s); display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 800; }
@@ -139,10 +137,10 @@
     </div>
     <p class="meta" id="latest-meta">Android 7 or newer · Latest version on GitHub Releases</p>
 
-    <div class="hero-card" aria-hidden="true">
-      <div class="label">● Next up</div>
-      <div class="t">Commonwealth Shared Scholarship</div>
-      <div class="count"><b>3</b><span>days left</span></div>
+    <div class="shots" role="list" aria-label="Screenshots of Shibal on Android">
+      <figure role="listitem"><img src="screens/home.webp" width="540" height="1200" alt="Home screen showing the next deadline with a 7 days left countdown" loading="eager"><figcaption>What closes next, at a glance</figcaption></figure>
+      <figure role="listitem"><img src="screens/share.webp" width="540" height="1200" alt="A shared Chevening post with its deadline spotted automatically" loading="lazy"><figcaption>Share a post, the deadline is spotted</figcaption></figure>
+      <figure role="listitem"><img src="screens/settings.webp" width="540" height="1200" alt="Settings confirming reminders will reach you" loading="lazy"><figcaption>Checks that reminders will reach you</figcaption></figure>
     </div>
 
     <section id="install">
