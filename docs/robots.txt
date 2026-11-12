@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://tekkarashi.github.io/shibal/sitemap.xml

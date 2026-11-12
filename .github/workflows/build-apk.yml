@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    # The download site and docs don't change the app, so they don't need a 30-minute build.
+    paths-ignore: ['docs/**', '**.md']
   pull_request:
   workflow_dispatch:
 
