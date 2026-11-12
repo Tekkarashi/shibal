@@ -82,7 +82,9 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The release APK is signed with the standard Android debug key so it installs without setup. That is fine for trying it out, but anyone can sign an APK with that key, so before sharing it widely create your own keystore (or let EAS manage one) and wire it in. Play also reviews apps that declare exact-alarm permissions, so declare your use case there.
+**Signing.** From 0.2.0, releases are signed with Shibal's private key (certificate `CN=Shibal, O=Tekkarashi`, SHA-256 `20:29:91:05:3F:12:D9:C6:5C:B6:C7:DB:36:B4:8D:4B:74:D0:4C:BC:90:71:3D:0C:6E:E9:E5:9D:10:05:9C:18`). The key lives in the repository secrets `SHIBAL_KEYSTORE_B64`, `SHIBAL_KEYSTORE_PASSWORD` and `SHIBAL_KEY_ALIAS`; `plugins/withReleaseSigning.js` uses it, every build log prints the APK's signer, and a tagged release refuses to build without it. Local builds and pull requests from forks fall back to the public debug key. The 0.1.x releases used the debug key, so moving from them to 0.2.0 is a one-time reinstall that the app guides (back up, uninstall, install, restore). Play also reviews apps that declare exact-alarm permissions, so declare your use case there if Shibal ever goes to the Play Store.
+
+**Releasing.** Write `release-notes/vX.Y.Z.md` (the app shows it as "what's new"), bump `version` in `package.json` and `app.json` and `versionCode` in `app.json`, then push a `vX.Y.Z` tag. CI builds, runs the emulator tests, and publishes only if they pass; every installed Shibal then offers the update.
 
 ### Previewing the UI in a browser
 
