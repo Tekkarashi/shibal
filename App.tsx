@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, StackActions, type Theme as NavTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -28,7 +28,8 @@ import './src/webPreview';
 // Keep the branded splash up until fonts and saved items are ready, then fade it out.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 SplashScreen.setOptions({ fade: true, duration: 220 });
-import { ToastProvider } from './src/toast';
+import { DialogProvider } from './src/dialog';
+import { ToastProvider, useToast } from './src/toast';
 
 const Stack = createNativeStackNavigator<RootStack>();
 
@@ -37,6 +38,7 @@ function Effects({ navReady }: { navReady: boolean }) {
   const { store, checkHealth, now } = useApp();
   const { replan } = store;
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
+  const toast = useToast();
   const ready = useRef(false);
 
   // First launch: channel, permission, and an initial plan of every reminder.
@@ -81,7 +83,7 @@ function Effects({ navReady }: { navReady: boolean }) {
       }
 
       if (!text.trim() && !shareIntent.webUrl) {
-        Alert.alert('Nothing to save', 'That share had no text or link in it.');
+        toast({ message: 'That share had no text or link to save', icon: 'alert-circle' });
         return;
       }
 
@@ -167,7 +169,9 @@ export default function App() {
         <KeyboardProvider>
         <ShareIntentProvider>
           <AppProvider>
-            <ToastProvider>{fontsLoaded || fontError ? <Navigator /> : <View style={{ flex: 1, backgroundColor: t.c.bg }} />}</ToastProvider>
+            <ToastProvider>
+              <DialogProvider>{fontsLoaded || fontError ? <Navigator /> : <View style={{ flex: 1, backgroundColor: t.c.bg }} />}</DialogProvider>
+            </ToastProvider>
           </AppProvider>
         </ShareIntentProvider>
         </KeyboardProvider>

@@ -11,6 +11,7 @@ permissions:
   contents: write
 
 jobs:
+  # The APK people install: ARM only (32-bit and 64-bit), which is every phone.
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -49,7 +50,7 @@ jobs:
 
       - name: Build release APK
         working-directory: android
-        # Phones only (32-bit and 64-bit ARM). Cheaper Android Go devices still run 32-bit.
+        # Cheaper Android Go devices still run 32-bit, so both ARM flavours go in.
         run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
 
       - name: Name the APK
@@ -58,16 +59,98 @@ jobs:
           VERSION=$(node -p "require('./package.json').version")
           mkdir -p dist
           cp android/app/build/outputs/apk/release/app-release.apk "dist/Shibal-v${VERSION}.apk"
-          echo "path=dist/Shibal-v${VERSION}.apk" >> "$GITHUB_OUTPUT"
+          # A stable name too, so releases/latest/download/Shibal.apk always points at the newest build.
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/Shibal.apk"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
           name: Shibal-apk
-          path: ${{ steps.apk.outputs.path }}
+          path: dist/
 
-      - name: Publish a release
-        if: startsWith(github.ref, 'refs/tags/v')
+  # The same app built for the emulator's x86_64 CPU, installed and driven like a person would.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - run: npm ci
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: '1'
+
+      - name: Build release APK for the emulator
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace -PreactNativeArchitectures=x86_64
+
+      - name: Enable KVM for a fast emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        run: curl -fsSL "https://get.maestro.mobile.dev" | bash
+
+      - name: Run end-to-end tests on an Android 14 emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash e2e/run.sh android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Keep screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-results/
+          if-no-files-found: ignore
+
+  # Tags publish a release, but only once the build and the end-to-end run have both passed.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [apk, e2e]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Shibal-apk
+          path: dist
+
+      - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.apk.outputs.path }}
+          files: dist/*.apk
           generate_release_notes: true
+          body: |
+            ## Install on Android
+
+            1. Download **Shibal.apk** below on your phone (Android 7 or newer).
+            2. Open it. Android asks to allow installs from your browser: allow it for this install.
+            3. Open Shibal, allow notifications, then Settings → **Send a test** to check reminders reach you.
+
+            Updating? Install the new APK over the old one. Your saved items stay.

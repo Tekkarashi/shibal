@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
+import { Linking, Platform, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -110,13 +110,14 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
     [store, toast],
   );
 
-  const openLink = (url: string) => Linking.openURL(url).catch(() => Alert.alert('Could not open the link', url));
+  const openLink = (url: string) => Linking.openURL(url).catch(() => toast({ message: 'Could not open that link', icon: 'link-2' }));
   const open = (id: string) => navigation.push('form', { id });
   const add = () => navigation.push('form', {});
 
   const importChat = async () => {
-    const raw = await pickWhatsAppExport();
-    if (raw) navigation.push('import', { raw });
+    const res = await pickWhatsAppExport();
+    if ('raw' in res) navigation.push('import', { raw: res.raw });
+    else if ('error' in res) toast({ message: res.error, icon: 'alert-circle' });
   };
 
   const dateLine = `${DAYS[now.getDay()]} ${now.getDate()} ${MONTHS[now.getMonth()]}`;
@@ -130,7 +131,7 @@ export default function Home({ navigation }: ScreenProps<'home'>) {
         {store.items.length > 0 ? (
           <IconButton icon={query === null ? 'search' : 'x'} label={query === null ? 'Search' : 'Close search'} onPress={() => setQuery(query === null ? '' : null)} />
         ) : null}
-        <IconButton icon="settings" label="Settings" onPress={() => navigation.push('settings')} />
+        <IconButton icon="settings" label="Settings" testID="settings" onPress={() => navigation.push('settings')} />
       </View>
 
       {query !== null ? (

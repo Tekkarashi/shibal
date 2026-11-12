@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, AppState, Linking, ScrollView, Switch, View } from 'react-native';
+import { AppState, Linking, ScrollView, Switch, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Application from 'expo-application';
 import * as Device from 'expo-device';
 import * as Haptics from 'expo-haptics';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useApp } from '../context';
+import { useConfirm } from '../dialog';
 import { pickWhatsAppExport } from '../importFile';
 import type { ScreenProps } from '../nav';
 import { askExactAlarmPermission, askNotificationPermission, getHealth, scheduledCount, scheduleTest, type Health } from '../notifications';
@@ -70,6 +71,7 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
   const { c } = useTheme();
   const s = useStyles();
   const toast = useToast();
+  const confirm = useConfirm();
   const [health, setHealth] = useState<Health | null>(null);
   const [count, setCount] = useState(0);
 
@@ -97,17 +99,27 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
   const fixNotifications = async () => {
     const ok = await askNotificationPermission().catch(() => false);
     if (!ok) {
-      Alert.alert('Notifications are blocked', 'Open the app settings and allow notifications.', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open settings', onPress: openAppSettings },
-      ]);
+      const go = await confirm({
+        title: 'Notifications are blocked',
+        message: 'Android won’t ask again from inside the app. Open Shibal’s settings and allow notifications.',
+        confirm: 'Open settings',
+        cancel: 'Not now',
+        icon: 'bell-off',
+      });
+      if (go) openAppSettings();
     }
     refresh();
   };
 
   const fixAlarms = async () => {
     const ok = await askExactAlarmPermission();
-    if (!ok) Alert.alert('Allow alarms and reminders', 'Find “Alarms & reminders” for Shibal and switch it on.');
+    if (!ok)
+      await confirm({
+        title: 'Allow alarms and reminders',
+        message: 'Find “Alarms & reminders” for Shibal and switch it on, so reminders fire at the exact minute.',
+        confirm: 'Got it',
+        icon: 'clock',
+      });
     refresh();
   };
 
@@ -122,12 +134,18 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
     }
     await scheduleTest(60, settings.strict);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    Alert.alert('Test set for 1 minute from now', 'Close Shibal completely (swipe it away) and lock the phone. The reminder should still arrive.');
+    await confirm({
+      title: 'Test set for 1 minute',
+      message: 'Close Shibal completely (swipe it away) and lock the phone. The reminder should still arrive.',
+      confirm: 'Got it',
+      icon: 'send',
+    });
   };
 
   const importChat = async () => {
-    const raw = await pickWhatsAppExport();
-    if (raw) navigation.push('import', { raw });
+    const res = await pickWhatsAppExport();
+    if ('raw' in res) navigation.push('import', { raw: res.raw });
+    else if ('error' in res) toast({ message: res.error, icon: 'alert-circle' });
   };
 
   const allGood = !!health?.notifications && !!health?.exactAlarms;

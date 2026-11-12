@@ -1,13 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, TextInput, View } from 'react-native';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Linking, Platform, ScrollView, TextInput, View, type TextInputInstance } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useApp } from '../context';
+import { useConfirm } from '../dialog';
+import { pickDateTime } from '../pickDateTime';
 import { addDays, atTime, endOfDay, extractUrls, startOfDay, timeLeft } from '../logic';
 import type { ScreenProps } from '../nav';
 import { F, makeStyles, NO_OUTLINE, RADIUS, SPACE, useTheme } from '../theme';
@@ -38,6 +39,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const { c } = useTheme();
   const s = useStyles();
   const toast = useToast();
+  const confirm = useConfirm();
 
   const editingItem = route.params?.id ? store.items.find((i) => i.id === route.params.id) : undefined;
   const editing = !!route.params?.id;
@@ -57,7 +59,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const [deadline, setDeadline] = useState<Date | null>(initial.deadline ? new Date(initial.deadline) : null);
   const [guessNote, setGuessNote] = useState<string | undefined>(initial.guessedFrom);
   const [focus, setFocus] = useState<'title' | 'url' | 'notes' | null>(null);
-  const [titleHeight, setTitleHeight] = useState<number | null>(null);
+  const titleRef = useRef<TextInputInstance>(null);
   const leaving = useRef(false);
 
   const finalUrl = cleanUrl(url);
@@ -67,6 +69,16 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
     (finalUrl ?? '') !== (initial.url ?? '') ||
     notes !== initial.notes ||
     (deadline?.toISOString() ?? null) !== initial.deadline;
+
+  // Android sizes a multiline input to its text by itself. In the browser the box only ever grows,
+  // so measure it from scratch on every change: Enter adds a line, Backspace takes it away again.
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const el = titleRef.current as unknown as HTMLTextAreaElement | null;
+    if (!el?.style) return;
+    el.style.height = '0px';
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [title]);
 
   // The item was deleted elsewhere (e.g. from a notification tap after deletion).
   useEffect(() => {
@@ -82,12 +94,21 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
       navigation.addListener('beforeRemove', (e) => {
         if (!dirty || leaving.current) return;
         e.preventDefault();
-        Alert.alert('Discard changes?', 'What you typed here will be lost.', [
-          { text: 'Keep editing', style: 'cancel' },
-          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
-        ]);
+        confirm({
+          title: 'Discard changes?',
+          message: 'What you typed here will be lost.',
+          confirm: 'Discard',
+          cancel: 'Keep editing',
+          tone: 'danger',
+          icon: 'edit-3',
+        }).then((ok) => {
+          if (ok) {
+            leaving.current = true;
+            navigation.dispatch(e.data.action);
+          }
+        });
       }),
-    [navigation, dirty],
+    [navigation, dirty, confirm],
   );
 
   const setDate = (d: Date | null) => {
@@ -96,16 +117,15 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   };
 
   const openPicker = (mode: 'date' | 'time') => {
-    if (Platform.OS !== 'android') return;
     const base = deadline ?? endOfDay(addDays(startOfDay(now), 7));
-    DateTimePickerAndroid.open({
-      value: base,
+    pickDateTime({
       mode,
-      is24Hour: false,
-      minimumDate: mode === 'date' && !editing ? startOfDay(now) : undefined,
-      onChange: (e, d) => {
-        if (e.type !== 'set' || !d) return;
+      value: base,
+      minimumDate: editing ? undefined : startOfDay(now),
+      onPick: (d) => {
+        Haptics.selectionAsync().catch(() => undefined);
         if (mode === 'date') {
+          // Keep the time already chosen; a fresh date defaults to the end of that day.
           const time = deadline ?? endOfDay(d);
           setDate(atTime(d, time.getHours(), time.getMinutes()));
         } else {
@@ -144,7 +164,8 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
     const t = title.trim();
     if (!t && !finalUrl) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
-      Alert.alert('Add a title or a link first');
+      toast({ message: 'Add a title or a link first', icon: 'edit-3' });
+      titleRef.current?.focus();
       return;
     }
     const draft: Draft = {
@@ -164,10 +185,13 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
       }
     };
     if (past && !editing) {
-      Alert.alert('That date has passed', 'Save it anyway? You will not get reminders for a past deadline.', [
-        { text: 'Change date', style: 'cancel' },
-        { text: 'Save anyway', onPress: doSave },
-      ]);
+      confirm({
+        title: 'That date has passed',
+        message: 'Save it anyway? You won’t get reminders for a past deadline.',
+        confirm: 'Save anyway',
+        cancel: 'Change date',
+        icon: 'alert-circle',
+      }).then((ok) => ok && doSave());
       return;
     }
     doSave();
@@ -184,11 +208,11 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         beginTime: end - 30 * 60_000,
         endTime: end,
       },
-    }).catch(() => Alert.alert('No calendar app found on this phone'));
+    }).catch(() => toast({ message: 'No calendar app found on this phone', icon: 'calendar' }));
   };
 
   const openLink = () => {
-    if (finalUrl) Linking.openURL(finalUrl).catch(() => Alert.alert('Could not open the link', finalUrl));
+    if (finalUrl) Linking.openURL(finalUrl).catch(() => toast({ message: 'Could not open that link', icon: 'link-2' }));
   };
 
   const setStatus = (status: 'applied' | 'skipped' | 'open') => {
@@ -206,25 +230,23 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
     navigation.goBack();
   };
 
-  const confirmDelete = () =>
-    Alert.alert('Delete this?', 'It will be removed along with its reminders.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          if (!editingItem) return;
-          const copy = editingItem;
-          leaving.current = true;
-          store.removeItem(copy.id);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
-          toast({ message: 'Deleted', icon: 'trash-2', action: { label: 'Undo', onPress: () => store.restoreItem(copy) } });
-          navigation.goBack();
-        },
-      },
-    ]);
-
-  const canPick = Platform.OS === 'android';
+  const confirmDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete this?',
+      message: 'It will be removed along with its reminders.',
+      confirm: 'Delete',
+      cancel: 'Cancel',
+      tone: 'danger',
+      icon: 'trash-2',
+    });
+    if (!ok || !editingItem) return;
+    const copy = editingItem;
+    leaving.current = true;
+    store.removeItem(copy.id);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+    toast({ message: 'Deleted', icon: 'trash-2', action: { label: 'Undo', onPress: () => store.restoreItem(copy) } });
+    navigation.goBack();
+  };
 
   return (
     <SafeAreaView style={s.screen} edges={['top', 'left', 'right']}>
@@ -232,7 +254,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         title={editing ? 'Edit' : 'New opportunity'}
         onBack={() => navigation.goBack()}
         backIcon="x"
-        right={<Button kind="primary" small label="Save" onPress={save} />}
+        right={<Button kind="primary" small label="Save" testID="save-top" onPress={save} />}
       />
       <KeyboardAwareScrollView bottomOffset={28} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {route.params?.notice ? (
@@ -245,7 +267,9 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         ) : null}
 
         <TextInput
-          style={[s.titleInput, NO_OUTLINE, focus === 'title' && { borderBottomColor: c.accent }, titleHeight ? { height: titleHeight } : null]}
+          ref={titleRef}
+          testID="title-input"
+          style={[s.titleInput, NO_OUTLINE, focus === 'title' && { borderBottomColor: c.accent }]}
           value={title}
           onChangeText={setTitle}
           onFocus={() => setFocus('title')}
@@ -253,17 +277,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           placeholder="What’s the opportunity?"
           placeholderTextColor={c.faint}
           multiline
-          // Android grows a multiline input with its text on its own; the browser preview is sized from its content.
           {...(Platform.OS === 'web' ? { rows: 1 } : null)}
-          onContentSizeChange={
-            Platform.OS === 'web'
-              ? (e) => {
-                  // The browser reports scrollHeight, which already includes padding; add only the 2px underline.
-                  const next = Math.ceil(e.nativeEvent.contentSize.height) + 2;
-                  setTitleHeight((h) => (h !== null && Math.abs(h - next) <= 2 ? h : next));
-                }
-              : undefined
-          }
           autoFocus={!editing && !initial.title}
           accessibilityLabel="Title"
         />
@@ -277,7 +291,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
             {deadline ? <Pill tone={past ? 'danger' : 'accent'} icon="clock" label={timeLeft(deadline.toISOString(), now)} /> : null}
           </View>
 
-          <Tap onPress={() => openPicker('date')} disabled={!canPick} accessibilityRole="button" accessibilityLabel="Pick a date" style={{ marginTop: SPACE.md }}>
+          <Tap onPress={() => openPicker('date')} accessibilityRole="button" accessibilityLabel="Pick a date" style={{ marginTop: SPACE.md }}>
             {deadline ? (
               <View>
                 <T style={[s.bigDate, past && { color: c.danger }]}>
@@ -309,8 +323,8 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           ) : null}
 
           <View style={{ flexDirection: 'row', marginTop: SPACE.lg, gap: SPACE.sm }}>
-            <Button small kind="hero" icon="calendar" label={deadline ? 'Change date' : 'Pick a date'} onPress={() => openPicker('date')} disabled={!canPick} />
-            <Button small icon="clock" label="Time" onPress={() => openPicker('time')} disabled={!deadline || !canPick} />
+            <Button small kind="hero" icon="calendar" label={deadline ? 'Change date' : 'Pick a date'} testID="pick-date" onPress={() => openPicker('date')} />
+            <Button small icon="clock" label="Time" testID="pick-time" onPress={() => openPicker('time')} disabled={!deadline} />
             {deadline ? <Button small kind="ghost" icon="x" label="" accessibilityLabel="Clear the deadline" onPress={() => setDate(null)} /> : null}
           </View>
         </View>
@@ -330,6 +344,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         <View style={[s.field, focus === 'url' && s.fieldFocused]}>
           <Icon name="link-2" size={18} color={focus === 'url' ? c.accent : c.muted} />
           <TextInput
+            testID="link-input"
             style={[s.fieldInput, NO_OUTLINE]}
             value={url}
             onChangeText={setUrl}
@@ -362,6 +377,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
           Notes
         </T>
         <TextInput
+          testID="notes-input"
           style={[s.field, s.notes, NO_OUTLINE, focus === 'notes' && s.fieldFocused]}
           value={notes}
           onChangeText={setNotes}
@@ -389,7 +405,7 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
             ) : (
               <Button icon="rotate-ccw" label="Put it back on the list" onPress={() => setStatus('open')} />
             )}
-            <Button kind="danger" icon="trash-2" label="Delete" onPress={confirmDelete} style={{ marginTop: SPACE.sm }} />
+            <Button kind="danger" icon="trash-2" label="Delete" testID="delete" onPress={confirmDelete} style={{ marginTop: SPACE.sm }} />
           </View>
         ) : null}
       </KeyboardAwareScrollView>

@@ -1,0 +1,114 @@
+# The core journey on a real Android emulator: first run, save with the native
+# date picker, mark applied + undo, unsaved-changes guard with the hardware Back
+# button, delete + undo, and reminder health in Settings.
+appId: com.tekkarashi.shibal
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "A quiet bank."
+    timeout: 30000
+- takeScreenshot: 01-first-run
+
+# Save a new opportunity using Android's own date picker
+- tapOn: "Save your first one"
+- assertVisible: "New opportunity"
+- tapOn:
+    id: "title-input"
+- inputText: "Zecathon Hackathon"
+- hideKeyboard
+- tapOn:
+    id: "pick-date"
+- extendedWaitUntil:
+    visible: "OK"
+    timeout: 10000
+- takeScreenshot: 02-native-date-picker
+- tapOn: "OK"
+- assertVisible: "by 11:59 PM"
+- tapOn:
+    id: "pick-time"
+- extendedWaitUntil:
+    visible: "OK"
+    timeout: 10000
+- tapOn: "OK"
+- assertVisible: "by 11:59 PM"
+- tapOn:
+    id: "link-input"
+- inputText: "zecathon.dev/apply"
+- hideKeyboard
+- takeScreenshot: 03-form-filled
+- tapOn:
+    id: "save-top"
+- extendedWaitUntil:
+    visible: "In the bank. Reminders are set."
+    timeout: 5000
+- assertVisible: "Zecathon Hackathon"
+- assertVisible: "(NEXT UP|Next up)"
+- assertVisible: "zecathon.dev"
+- takeScreenshot: 04-home-with-item
+
+# Mark applied from the Next up card, then Undo
+- tapOn: "I applied"
+- extendedWaitUntil:
+    visible: "All clear."
+    timeout: 5000
+- tapOn: "Undo"
+- extendedWaitUntil:
+    visible: "Zecathon Hackathon"
+    timeout: 5000
+
+# Edit, then press the hardware Back button with unsaved changes
+- tapOn: "Next up: Zecathon Hackathon.*"
+- assertVisible: "Edit"
+- tapOn:
+    id: "notes-input"
+- inputText: "Team of 3"
+- hideKeyboard
+- back
+- extendedWaitUntil:
+    visible: 'Discard changes\?'
+    timeout: 5000
+- takeScreenshot: 05-discard-dialog
+- tapOn:
+    id: "dialog-cancel"
+- assertVisible: "Team of 3"
+- tapOn:
+    id: "save-top"
+- extendedWaitUntil:
+    visible: "Saved"
+    timeout: 5000
+
+# Delete, then Undo
+- tapOn: "Next up: Zecathon Hackathon.*"
+- scrollUntilVisible:
+    element:
+      id: "delete"
+- tapOn:
+    id: "delete"
+- extendedWaitUntil:
+    visible: 'Delete this\?'
+    timeout: 5000
+- tapOn:
+    id: "dialog-confirm"
+- extendedWaitUntil:
+    visible: "A quiet bank."
+    timeout: 5000
+- tapOn: "Undo"
+- extendedWaitUntil:
+    visible: "Zecathon Hackathon"
+    timeout: 5000
+
+# Settings: reminders really scheduled with Android, then a test notification
+- tapOn:
+    id: "settings"
+- extendedWaitUntil:
+    visible: "Reminders will reach you"
+    timeout: 10000
+- assertVisible: "[1-9][0-9]* reminders? scheduled on this phone\\."
+- takeScreenshot: 06-settings-health
+- tapOn: "Send a test"
+- extendedWaitUntil:
+    visible: "Test set for 1 minute"
+    timeout: 5000
+- tapOn:
+    id: "dialog-confirm"

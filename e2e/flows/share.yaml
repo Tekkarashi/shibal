@@ -1,0 +1,17 @@
+# Runs after e2e/run.sh shares a message into the app with an Android SEND
+# intent, the same way Instagram, X or Chrome would.
+appId: com.tekkarashi.shibal
+---
+- extendedWaitUntil:
+    visible: "New opportunity"
+    timeout: 20000
+- assertVisible: "Chevening Scholarships 2027.*"
+- assertVisible: ".*Spotted in the text.*"
+- assertVisible: '.*chevening\.org/apply'
+- takeScreenshot: 07-shared-into-app
+- tapOn:
+    id: "save-top"
+- extendedWaitUntil:
+    visible: "In the bank. Reminders are set."
+    timeout: 5000
+- takeScreenshot: 08-shared-item-saved

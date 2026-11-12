@@ -93,6 +93,7 @@ export function Button({
   style,
   full,
   accessibilityLabel,
+  testID,
 }: {
   label: string;
   onPress: () => void;
@@ -103,6 +104,7 @@ export function Button({
   style?: StyleProp<ViewStyle>;
   full?: boolean;
   accessibilityLabel?: string;
+  testID?: string;
 }) {
   const { c } = useTheme();
   const s = useButton();
@@ -120,6 +122,7 @@ export function Button({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
+      testID={testID}
       accessibilityState={{ disabled: !!disabled }}
       hitSlop={small ? 8 : 0}
       style={[full && { alignSelf: 'stretch' }, style]}
@@ -156,12 +159,14 @@ export function IconButton({
   label,
   tone = 'plain',
   size = 44,
+  testID,
 }: {
   icon: IconName;
   onPress: () => void;
   label: string;
   tone?: 'plain' | 'filled' | 'accent';
   size?: number;
+  testID?: string;
 }) {
   const { c } = useTheme();
   const bg = tone === 'filled' ? c.surface : tone === 'accent' ? c.accentSoft : 'transparent';
@@ -171,6 +176,7 @@ export function IconButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}
+      testID={testID}
       hitSlop={8}
       innerStyle={{
         width: size,
