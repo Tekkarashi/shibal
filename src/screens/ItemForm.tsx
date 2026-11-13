@@ -64,7 +64,18 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   /** Where the guessed date came from: the shared text, the flyer, or the application page. */
   const [guessFrom, setGuessFrom] = useState<'text' | 'flyer' | 'page'>('text');
   /** What the box under an empty date is doing. */
-  const [scan, setScan] = useState<'idle' | 'reading' | 'looking' | 'none'>('idle');
+  // Something new with no date in its text gets its flyer read and its page checked on open.
+  const auto = useMemo(() => {
+    if (editing || initial.deadline) return null;
+    const page = cleanUrl(initial.url ?? '');
+    const pageOk = page && /^https?:\/\//i.test(page) ? page : null;
+    const flyer = initial.imageUri ?? null;
+    return flyer || pageOk ? { flyer, page: pageOk } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Start in the state the automatic check will be in, so the box does not change shape while the
+  // screen is still opening (Android can crash inserting views mid-transition).
+  const [scan, setScan] = useState<'idle' | 'reading' | 'looking' | 'none'>(auto ? (auto.flyer ? 'reading' : 'looking') : 'idle');
   /** A date on the flyer with no deadline word next to it (often the event day): offered, never set on its own. */
   const [maybe, setMaybe] = useState<{ date: Date; snippet: string } | null>(null);
   const [focus, setFocus] = useState<'title' | 'url' | 'notes' | null>(null);
@@ -184,13 +195,26 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const pageUrl = finalUrl && /^https?:\/\//i.test(finalUrl) ? finalUrl : null;
   const site = domainOf(pageUrl) || 'the page';
 
-  // Something new with no date in its text: read the flyer and check the page straight away.
+  // Wait until the screen has finished opening (and the keyboard has come up) before reading.
   useEffect(() => {
-    if (editing || initial.deadline) return;
-    const page = cleanUrl(initial.url ?? '');
-    const flyer = initial.imageUri ?? null;
-    const pageOk = page && /^https?:\/\//i.test(page) ? page : null;
-    if (flyer || pageOk) findDate({ flyer, page: pageOk });
+    if (!auto) return;
+    let started = false;
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      if (started || leaving.current) return;
+      started = true;
+      findDate(auto);
+    };
+    const off = navigation.addListener('transitionEnd', () => {
+      settle = setTimeout(start, 400);
+    });
+    // In case the transition event never comes (no animation, or opened from outside).
+    const fallback = setTimeout(start, 1200);
+    return () => {
+      off();
+      clearTimeout(settle);
+      clearTimeout(fallback);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

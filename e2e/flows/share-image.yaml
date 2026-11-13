@@ -11,6 +11,8 @@ appId: com.tekkarashi.shibal
 - takeScreenshot: 10-flyer-shared
 - tapOn:
     id: "title-input"
+# Flyer reading may have filled in a title from the poster; start clean either way.
+- eraseText: 200
 - inputText: "Mastercard Scholars Program"
 - hideKeyboard
 - tapOn: "In 2 weeks"
