@@ -1,6 +1,6 @@
 {
   "name": "shibal",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "main": "index.ts",
   "dependencies": {
@@ -30,6 +30,7 @@
     "expo-splash-screen": "~58.0.13",
     "expo-status-bar": "~58.0.4",
     "expo-system-ui": "~58.0.7",
+    "expo-text-extractor": "^2.0.0",
     "fflate": "^0.8.2",
     "react": "^19.3.0",
     "react-dom": "19.3.0",

@@ -10,7 +10,7 @@ Direct link to the latest APK: [Shibal.apk](https://github.com/Tekkarashi/shibal
 
 It exists because links saved in a WhatsApp chat with yourself, browser bookmarks and screenshots get buried, and the deadline passes while you are not looking. Shibal replaces the pile with one list that goes looking for you.
 
-Everything is stored on your phone. Nothing is uploaded and there is no account.
+Everything is stored on your phone. Nothing is uploaded and there is no account. Flyers are read on the phone itself. To find a deadline, Shibal may open a saved link's page, the same request your browser makes when you tap it.
 
 ## Install
 
@@ -23,11 +23,13 @@ Everything is stored on your phone. Nothing is uploaded and there is no account.
 
 ## Using it
 
-**Save.** In WhatsApp, Instagram, TikTok, X, Chrome, Telegram or any app with a Share button, tap Share and choose **Save to Shibal**. Shared flyers and screenshots are kept with the item. The title and link are filled in for you. If the text mentions a date such as "Deadline: 30 November", it is picked up and shown so you can check it. Set a deadline and save.
+**Save.** In WhatsApp, Instagram, TikTok, X, Chrome, Telegram or any app with a Share button, tap Share and choose **Save to Shibal**. Shared flyers and screenshots are kept with the item. The title and link are filled in for you. If the text mentions a date ("Deadline: 30 November", "apply before Friday", "closes in 2 weeks"), it is picked up and shown so you can check it. If the text has no date, Shibal reads the flyer or screenshot on your phone, then opens the application page, and looks for a date next to words like "deadline", "apply by" or "applications close". A date on a flyer with no such word next to it (usually the event day) is offered, not filled in. When nothing turns up (a flyer without the deadline on it, or a page that loads its text with scripts), the form says so and you pick the date yourself. Set a deadline and save.
+
+Reading flyers uses Google's on-device text recognition through Google Play services. Play downloads the small model when Shibal is installed. On a phone without Play services, flyers are kept but not read.
 
 **Sort.** The home screen leads with what closes next and a countdown, then groups the rest by urgency: missed, due today, next 3 days, this week, later, and links that still need a deadline. Swipe a card right when you have applied, left to skip it. Every change can be undone from the toast that follows.
 
-**Remind.** Each deadline gets a ladder of reminders: 1 week, 3 days and 1 day before at 9 AM, the morning of the deadline at 8 AM, then 3 hours and 1 hour before. A morning summary at 8 AM appears on days when something is due within 3 days, and on Mondays it tells you how many saved links still have no deadline. Reminders already in the past when you save are skipped, and ones that would land within 45 minutes of each other are merged.
+**Remind.** Reminders get more frequent as the deadline gets closer, and they keep coming until you mark the item applied or skip it: every day at 9 AM from a week out until three days out, three times a day (9 AM, 1 PM, 7 PM) for the last two days, then on the day at 8 AM and 1 PM, and 3 hours and 1 hour before. A morning summary at 8 AM appears on days when something is due within 3 days, and on Mondays it tells you how many saved links still have no deadline. Reminders already in the past when you save are skipped, and ones that would land within 45 minutes of each other are merged.
 
 **Tap a reminder** and the item opens, with a button to open the link.
 
@@ -92,13 +94,15 @@ git push origin v0.1.0
 
 ## How it is built
 
-Expo SDK 58 and React Native 0.88, TypeScript, local storage with AsyncStorage. `expo-notifications` schedules reminders and `expo-share-intent` receives shared links. The interface uses React Navigation's native stack, Reanimated 4 and Gesture Handler for motion and swipes, `expo-haptics` for touch feedback, and Fraunces with Manrope for type. It follows the phone's light or dark mode.
+Expo SDK 58 and React Native 0.88, TypeScript, local storage with AsyncStorage. `expo-notifications` schedules reminders, `expo-share-intent` receives shared links and `expo-text-extractor` reads flyers with ML Kit text recognition (`plugins/withTextRecognitionModel.js` asks Play to fetch its model at install). The interface uses React Navigation's native stack, Reanimated 4 and Gesture Handler for motion and swipes, `expo-haptics` for touch feedback, and Fraunces with Manrope for type. It follows the phone's light or dark mode.
 
-The parts worth reading are pure functions in `src/logic.ts` with tests in `test/logic.test.ts`: urgency buckets, the reminder ladder, date guessing, the WhatsApp parser and the home screen's headline.
+The parts worth reading are pure functions in `src/logic.ts` with tests in `test/logic.test.ts`: urgency buckets, the reminder ladder, date guessing (in text and on application pages), the WhatsApp parser and the home screen's headline.
 
 ```
 src/logic.ts          buckets, reminder ladder, deadline guessing, WhatsApp import, home copy
 src/notifications.ts  permission checks and scheduling
+src/pageScan.ts       fetches a saved link's page to look for its deadline
+src/ocr.ts            reads the text on a shared flyer, on the phone
 src/useStore.ts       items and settings, saved on every change
 src/theme.ts          colours (light and dark), type, spacing, motion tokens
 src/ui.tsx            text, buttons, chips, pills, cards, press feedback

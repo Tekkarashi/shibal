@@ -8,7 +8,9 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import { useApp } from '../context';
 import { useConfirm } from '../dialog';
 import { pickDateTime } from '../pickDateTime';
-import { addDays, atTime, endOfDay, extractUrls, startOfDay, timeLeft } from '../logic';
+import { addDays, atTime, domainOf, endOfDay, extractUrls, parseDeadline, shorten, startOfDay, timeLeft, type DeadlineGuess } from '../logic';
+import { readImageText } from '../ocr';
+import { findDeadlineOnPage } from '../pageScan';
 import type { ScreenProps } from '../nav';
 import { F, makeStyles, NO_OUTLINE, RADIUS, SPACE, useTheme } from '../theme';
 import { useToast } from '../toast';
@@ -59,6 +61,12 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
   const [viewing, setViewing] = useState(false);
   const [deadline, setDeadline] = useState<Date | null>(initial.deadline ? new Date(initial.deadline) : null);
   const [guessNote, setGuessNote] = useState<string | undefined>(initial.guessedFrom);
+  /** Where the guessed date came from: the shared text, the flyer, or the application page. */
+  const [guessFrom, setGuessFrom] = useState<'text' | 'flyer' | 'page'>('text');
+  /** What the box under an empty date is doing. */
+  const [scan, setScan] = useState<'idle' | 'reading' | 'looking' | 'none'>('idle');
+  /** A date on the flyer with no deadline word next to it (often the event day): offered, never set on its own. */
+  const [maybe, setMaybe] = useState<{ date: Date; snippet: string } | null>(null);
   const [focus, setFocus] = useState<'title' | 'url' | 'notes' | null>(null);
   const titleRef = useRef<TextInputInstance>(null);
   const leaving = useRef(false);
@@ -117,6 +125,74 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
     setDeadline(d);
     setGuessNote(undefined);
   };
+
+  // Reading the flyer and the page takes a moment; never overwrite what the user typed meanwhile.
+  const deadlineRef = useRef(deadline);
+  deadlineRef.current = deadline;
+  const titleNow = useRef(title);
+  titleNow.current = title;
+  const notesNow = useRef(notes);
+  notesNow.current = notes;
+
+  const takeGuess = (g: { date: Date; snippet: string }, from: 'flyer' | 'page') => {
+    if (deadlineRef.current) return;
+    Haptics.selectionAsync().catch(() => undefined);
+    setDeadline(g.date);
+    setGuessNote(g.snippet);
+    setGuessFrom(from);
+    setMaybe(null);
+  };
+
+  /** Reads the flyer first (on the phone), then the application page. Stops at the first deadline found. */
+  const findDate = async ({ flyer, page }: { flyer?: string | null; page?: string | null }) => {
+    let unsure: DeadlineGuess | null = null;
+    if (flyer) {
+      setScan('reading');
+      const text = await readImageText(flyer);
+      if (leaving.current) return;
+      if (text) {
+        // A flyer shared without a caption has nothing else to name it or search it by.
+        if (!titleNow.current.trim()) {
+          const line = text.split('\n').map((l) => l.trim()).find((l) => l.length > 3 && /[a-z]/i.test(l));
+          if (line) setTitle(shorten(line, 90));
+        }
+        if (!notesNow.current.trim()) setNotes(text.slice(0, 1200));
+        const g = parseDeadline(text, new Date());
+        if (g?.confident) {
+          takeGuess(g, 'flyer');
+          setScan('idle');
+          return;
+        }
+        unsure = g;
+      }
+    }
+    if (page) {
+      setScan('looking');
+      const g = await findDeadlineOnPage(page, new Date());
+      if (leaving.current) return;
+      if (g) {
+        takeGuess(g, 'page');
+        setScan('idle');
+        return;
+      }
+    }
+    const offer = unsure && !unsure.passed ? { date: unsure.date, snippet: unsure.snippet } : null;
+    setMaybe(offer);
+    setScan(offer ? 'idle' : 'none');
+  };
+
+  const pageUrl = finalUrl && /^https?:\/\//i.test(finalUrl) ? finalUrl : null;
+  const site = domainOf(pageUrl) || 'the page';
+
+  // Something new with no date in its text: read the flyer and check the page straight away.
+  useEffect(() => {
+    if (editing || initial.deadline) return;
+    const page = cleanUrl(initial.url ?? '');
+    const flyer = initial.imageUri ?? null;
+    const pageOk = page && /^https?:\/\//i.test(page) ? page : null;
+    if (flyer || pageOk) findDate({ flyer, page: pageOk });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openPicker = (mode: 'date' | 'time') => {
     const base = deadline ?? endOfDay(addDays(startOfDay(now), 7));
@@ -339,8 +415,48 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
               <T v="small" style={{ flex: 1, marginLeft: SPACE.sm, color: past ? c.danger : c.inkSoft }}>
                 {past
                   ? `Read from “${guessNote}”. That date has already passed. Check for a new round or a later deadline.`
-                  : `Spotted in the text: “${guessNote}”. Check it’s right.`}
+                  : guessFrom === 'page'
+                    ? `Found on ${site}: “${guessNote}”. Check it’s right.`
+                    : guessFrom === 'flyer'
+                      ? `Read from the flyer: “${guessNote}”. Check it’s right.`
+                    : `Spotted in the text: “${guessNote}”. Check it’s right.`}
               </T>
+            </View>
+          ) : null}
+
+          {!deadline && (pageUrl || imageUri) ? (
+            <View style={s.guess}>
+              <Icon name={scan === 'none' ? 'help-circle' : maybe ? 'image' : 'search'} size={15} color={c.accent} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1, marginLeft: SPACE.sm }}>
+                <T v="small" style={{ color: c.inkSoft }}>
+                  {scan === 'reading'
+                    ? 'Reading the flyer…'
+                    : scan === 'looking'
+                      ? `Looking for a deadline on ${site}…`
+                      : maybe
+                        ? `The flyer mentions “${maybe.snippet}”, but not as the deadline. Use it if that’s right.`
+                        : scan === 'none'
+                          ? imageUri && pageUrl
+                            ? `No deadline found on the flyer or on ${site}. Open the link or look at the flyer, then pick the date.`
+                            : imageUri
+                              ? 'No deadline found on the flyer. Look at it closely or check the application page, then pick the date.'
+                              : `No deadline found on ${site}. Open the link and check, then pick the date.`
+                          : imageUri && pageUrl
+                            ? 'The date might be on the flyer or the application page.'
+                            : imageUri
+                              ? 'The date might be on the flyer.'
+                              : 'The date might be on the application page.'}
+                </T>
+                {scan !== 'reading' && scan !== 'looking' ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: SPACE.lg, rowGap: SPACE.sm, marginTop: SPACE.sm }}>
+                    {maybe ? <Action label="Use this date" onPress={() => takeGuess(maybe, 'flyer')} /> : null}
+                    {!maybe && scan === 'idle' && imageUri ? <Action label="Read the flyer" onPress={() => findDate({ flyer: imageUri })} /> : null}
+                    {!maybe && scan === 'idle' && pageUrl ? <Action label="Look on the page" onPress={() => findDate({ page: pageUrl })} /> : null}
+                    {scan === 'none' && pageUrl ? <Action label="Open the link" onPress={() => Linking.openURL(pageUrl).catch(() => undefined)} /> : null}
+                    {scan === 'none' && imageUri ? <Action label="View the flyer" onPress={() => setViewing(true)} /> : null}
+                  </View>
+                ) : null}
+              </View>
             </View>
           ) : null}
 
@@ -512,3 +628,15 @@ const useStyles = makeStyles(({ c }) => ({
   flyerBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACE.lg, paddingVertical: SPACE.md },
   viewer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)' },
 }));
+
+/** A small text button for the hint box under the date. */
+function Action({ label, onPress }: { label: string; onPress: () => void }) {
+  const { c } = useTheme();
+  return (
+    <Tap onPress={onPress} accessibilityRole="button" hitSlop={10}>
+      <T v="caption" style={{ color: c.accent, fontFamily: F.bold }}>
+        {label}
+      </T>
+    </Tap>
+  );
+}

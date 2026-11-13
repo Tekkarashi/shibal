@@ -136,22 +136,35 @@ export interface Rung {
 
 const MIN_GAP_MS = 45 * 60_000;
 
+/** Times of day for the last two days before the deadline day. */
+const CLOSE_HOURS = [9, 13, 19];
+
 /**
- * Reminders for one deadline: a week, three days and one day out at 9 AM,
- * the morning of the day, then three hours and one hour before.
+ * Reminders for one deadline, more often the closer it gets, until the item
+ * is marked applied or skipped (callers only schedule open items):
+ * - every day at 9 AM from a week out to three days out,
+ * - three times a day (9 AM, 1 PM, 7 PM) two days out and the day before,
+ * - on the day: 8 AM and 1 PM, then three hours and one hour before.
  * Anything already in the past is dropped, and rungs closer than 45 minutes
  * to an earlier one are merged so the phone does not buzz twice in a row.
  */
 export function buildLadder(deadline: Date, now: Date): Rung[] {
   const day = startOfDay(deadline);
-  const candidates: Rung[] = [
-    { at: atTime(addDays(day, -7), 9), label: '1 week left', critical: false },
-    { at: atTime(addDays(day, -3), 9), label: '3 days left', critical: false },
-    { at: atTime(addDays(day, -1), 9), label: 'Due tomorrow', critical: false },
+  const candidates: Rung[] = [];
+  for (let n = 7; n >= 3; n--) {
+    candidates.push({ at: atTime(addDays(day, -n), 9), label: n === 7 ? '1 week left' : `${n} days left`, critical: false });
+  }
+  for (const n of [2, 1]) {
+    for (const h of CLOSE_HOURS) {
+      candidates.push({ at: atTime(addDays(day, -n), h), label: n === 1 ? 'Due tomorrow' : '2 days left', critical: false });
+    }
+  }
+  candidates.push(
     { at: atTime(day, 8), label: 'Due today', critical: true },
+    { at: atTime(day, 13), label: 'Due today', critical: true },
     { at: new Date(deadline.getTime() - 3 * 3_600_000), label: '3 hours left', critical: true },
     { at: new Date(deadline.getTime() - 3_600_000), label: '1 hour left', critical: true },
-  ];
+  );
 
   const floor = now.getTime() + 30_000;
   const future = candidates
@@ -286,7 +299,7 @@ const MONTH_LOOKUP: Record<string, number> = {
 };
 const MONTH_RE = '(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
 const ORD = '(?:st|nd|rd|th)?';
-const KEYWORD_RE = /(deadline|closes?|closing|closed(?: on)?|apply by|apply before|applications?\s+(?:close|end|due)|due|before|until|till|ends?|submit(?:ted)? by|last day|no later than|on or before|register by)\W*$/i;
+const KEYWORD_RE = /(deadline|closes?|closing|closed(?: on)?|apply by|apply before|applications?\s+(?:close|end|due)|due|before|until|till|ends?|submit(?:ted)? by|last day|no later than|on or before|register by)(?:\s+(?:is|was|on|by))?\W*$/i;
 
 export interface DeadlineGuess {
   date: Date;
@@ -405,6 +418,36 @@ export function parseDeadline(rawText: string, now: Date, writtenAt?: Date): Dea
     push(m, year, +m[2] - 1, +m[1]); // day first, the way it is written in Nigeria and the UK
   }
 
+  // Relative dates ("apply before Friday", "closes in 2 weeks", "deadline is tomorrow"), counted
+  // from when the text was written. They are only read right after a deadline word, since
+  // "hackathon this Friday" is usually the event, not the deadline.
+  const fixed = candidates.length;
+  const rel = (m: RegExpExecArray, d: Date) => push(m, d.getFullYear(), d.getMonth(), d.getDate());
+  const weekday = /\b(?:(this|next|coming)\s+)?(sun|mon|tue|wed|thu|fri|sat)(?:day|sday|nesday|rsday|urday|s|t|r|rs)?\b\.?/gi;
+  const relDay = /\b(today|tonight|tomorrow)\b/gi;
+  const inN = /\bin\s+(\d{1,2}|a|one|two|three|four)\s+(days?|weeks?)\b/gi;
+  const monthEnd = /\b(?:the\s+)?end\s+of\s+(?:the\s+|this\s+)?month\b/gi;
+  const WD = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+  const COUNT: Record<string, number> = { a: 1, one: 1, two: 2, three: 3, four: 4 };
+  while ((m = weekday.exec(text))) {
+    const target = WD.indexOf(m[2].toLowerCase());
+    let ahead = (target - anchor.getDay() + 7) % 7;
+    if (ahead === 0 && m[1]?.toLowerCase() === 'next') ahead = 7;
+    rel(m, addDays(anchor, ahead));
+  }
+  while ((m = relDay.exec(text))) rel(m, addDays(anchor, m[1].toLowerCase() === 'tomorrow' ? 1 : 0));
+  while ((m = inN.exec(text))) {
+    const n = COUNT[m[1].toLowerCase()] ?? parseInt(m[1], 10);
+    rel(m, addDays(anchor, m[2].toLowerCase().startsWith('week') ? n * 7 : n));
+  }
+  while ((m = monthEnd.exec(text))) rel(m, new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0));
+  // "Apply by: 30/11" with no year, common on flyers. Day first. Too easy to confuse with
+  // scores and times on its own, so it gets the same deadline-word rule.
+  const shortNumeric = /(?<![\d/.-])(\d{1,2})[/.](\d{1,2})(?![\d/.-])(?!\s*[ap]\.?m\b)/gi;
+  while ((m = shortNumeric.exec(text))) push(m, null, +m[2] - 1, +m[1]);
+  // Drop relative readings that had no deadline word in front of them.
+  for (let i = candidates.length - 1; i >= fixed; i--) if (!candidates[i].confident) candidates.splice(i, 1);
+
   if (candidates.length === 0) return null;
 
   // A date right after "deadline", "closes", etc. wins. Within that, the soonest
@@ -444,6 +487,58 @@ export function draftFromShared(
     source: opts.source,
     guessedFrom: guess?.snippet,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Reading a deadline off the application page                         */
+/* ------------------------------------------------------------------ */
+
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', ndash: '-', mdash: '-', hellip: '…' };
+
+function decodeEntities(s: string): string {
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (all, e: string) => {
+    if (e[0] === '#') {
+      const code = e[1].toLowerCase() === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return Number.isFinite(code) && code > 0 && code < 0x110000 ? String.fromCodePoint(code) : ' ';
+    }
+    return ENTITIES[e.toLowerCase()] ?? all;
+  });
+}
+
+/**
+ * The readable text of a web page: its description tags first (forms and
+ * event pages often put the deadline there), then the visible body text.
+ * Scripts, styles and markup are dropped.
+ */
+export function pageText(html: string): string {
+  const src = html.slice(0, 1_500_000);
+  const metas: string[] = [];
+  const metaRe = /<meta\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = metaRe.exec(src))) {
+    const tag = m[0];
+    if (!/(?:name|property)\s*=\s*["'](?:description|og:description|twitter:description)["']/i.test(tag)) continue;
+    const content = tag.match(/content\s*=\s*"([^"]*)"|content\s*=\s*'([^']*)'/i);
+    if (content) metas.push(content[1] ?? content[2]);
+  }
+  const body = src
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<(script|style|noscript|svg|template|head)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<\/?(p|div|br|li|h[1-6]|tr|td|th|section|article|header|footer|ul|ol|table|span|a|strong|b|em)\b[^>]*>/gi, (t) => (/^<\/?(span|a|strong|b|em)\b/i.test(t) ? ' ' : '\n'))
+    .replace(/<[^>]+>/g, ' ');
+  return decodeEntities([...metas, body].join('\n'))
+    .replace(/[ \t ]+/g, ' ')
+    .replace(/\s*\n\s*/g, '\n')
+    .trim();
+}
+
+/**
+ * A deadline read from an application page. A page is full of dates (event days,
+ * posting dates, last year's round), so only a date right after a deadline word counts.
+ */
+export function deadlineFromPage(html: string, now: Date): DeadlineGuess | null {
+  const guess = parseDeadline(pageText(html), now);
+  return guess && guess.confident ? guess : null;
 }
 
 /* ------------------------------------------------------------------ */

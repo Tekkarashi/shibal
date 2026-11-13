@@ -4,6 +4,7 @@ import {
   bucketOf, groupItems, buildLadder, buildDigests, parseDeadline, parseWhatsAppExport,
   itemsFromImport, formatDeadline, timeLeft, extractUrls, normalizeUrl, titleFrom, draftFromShared,
   headline, countdown, nextUp, isNewerVersion, releaseNotesSummary, makeBackup, readBackup, mergeItems,
+  pageText, deadlineFromPage,
 } from '../src/logic';
 import type { Item } from '../src/types';
 
@@ -72,23 +73,32 @@ test('formatDeadline and timeLeft read naturally', () => {
 
 /* ---------------- reminder ladder ---------------- */
 
-test('ladder for a deadline ten days out has all six rungs in order', () => {
-  const deadline = new Date(2026, 10, 21, 17, 0);
+test('ladder reminds daily from a week out, then three times a day, then hourly on the day', () => {
+  const deadline = new Date(2026, 10, 21, 17, 0); // Sat 21 Nov, 5 PM
   const rungs = buildLadder(deadline, NOW);
   assert.deepEqual(rungs.map((r) => r.label), [
-    '1 week left', '3 days left', 'Due tomorrow', 'Due today', '3 hours left', '1 hour left',
+    '1 week left', '6 days left', '5 days left', '4 days left', '3 days left',
+    '2 days left', '2 days left', '2 days left',
+    'Due tomorrow', 'Due tomorrow', 'Due tomorrow',
+    'Due today', 'Due today', '3 hours left', '1 hour left',
   ]);
   for (let i = 1; i < rungs.length; i++) assert.ok(rungs[i].at > rungs[i - 1].at);
-  assert.equal(rungs[0].at.getHours(), 9);
-  assert.deepEqual(rungs.map((r) => r.critical), [false, false, false, true, true, true]);
+  // One a day at 9 AM for the first stretch, one per calendar day.
+  assert.deepEqual(rungs.slice(0, 5).map((r) => [r.at.getDate(), r.at.getHours()]), [[14, 9], [15, 9], [16, 9], [17, 9], [18, 9]]);
+  // Three a day for the last two days before.
+  assert.deepEqual(rungs.slice(5, 11).map((r) => [r.at.getDate(), r.at.getHours()]), [[19, 9], [19, 13], [19, 19], [20, 9], [20, 13], [20, 19]]);
+  assert.deepEqual(rungs.slice(11).map((r) => r.at.getHours()), [8, 13, 14, 16]);
+  assert.ok(rungs.slice(0, 11).every((r) => !r.critical));
+  assert.ok(rungs.slice(11).every((r) => r.critical));
   assert.ok(rungs.every((r) => r.at < deadline));
 });
 
 test('ladder drops rungs already in the past', () => {
-  const deadline = new Date(2026, 10, 12, 17, 0); // tomorrow 5 PM
+  const deadline = new Date(2026, 10, 12, 17, 0); // tomorrow 5 PM; it is 1:14 PM now
   const rungs = buildLadder(deadline, NOW);
-  assert.deepEqual(rungs.map((r) => r.label), ['Due today', '3 hours left', '1 hour left']);
-  assert.equal(rungs[0].at.getDate(), 12);
+  assert.deepEqual(rungs.map((r) => r.label), ['Due tomorrow', 'Due today', 'Due today', '3 hours left', '1 hour left']);
+  assert.equal(rungs[0].at.getHours(), 19);
+  assert.equal(rungs[1].at.getDate(), 12);
 });
 
 test('ladder merges rungs that collide and keeps strict delivery', () => {
@@ -106,6 +116,12 @@ test('ladder with almost no time left gives one prompt now, or nothing', () => {
   assert.ok(soon[0].at.getTime() - NOW.getTime() <= 90_000);
   assert.equal(buildLadder(new Date(NOW.getTime() + 2 * 60_000), NOW).length, 0);
   assert.equal(buildLadder(new Date(NOW.getTime() - 60_000), NOW).length, 0);
+});
+
+test('ladder for a morning deadline drops the afternoon rung that would come after it', () => {
+  const deadline = new Date(2026, 10, 20, 10, 0); // Fri 20 Nov, 10 AM
+  const sameDay = buildLadder(deadline, NOW).filter((r) => r.at.getDate() === 20);
+  assert.deepEqual(sameDay.map((r) => [r.label, r.at.getHours()]), [['3 hours left', 7], ['Due today', 8], ['1 hour left', 9]]);
 });
 
 /* ---------------- digests ---------------- */
@@ -145,6 +161,70 @@ test('parseDeadline reads common ways of writing a date', () => {
   for (const [text, expected] of cases) {
     assert.equal(iso(parseDeadline(text, NOW)?.date), expected, text);
   }
+});
+
+test('parseDeadline reads relative dates right after a deadline word', () => {
+  // NOW is Wednesday 11 November 2026.
+  const cases: [string, string][] = [
+    ['apply before Friday', '2026-11-13 23:59'],
+    ['Apply before Friday 5pm!!', '2026-11-13 17:00'],
+    ['Deadline is tomorrow', '2026-11-12 23:59'],
+    ['registration closes in 2 weeks', '2026-11-25 23:59'],
+    ['applications close next Wednesday', '2026-11-18 23:59'],
+    ['deadline: this Wednesday', '2026-11-11 23:59'],
+    ['Deadline: end of the month', '2026-11-30 23:59'],
+    ['submit by Sat.', '2026-11-14 23:59'],
+  ];
+  for (const [text, expected] of cases) {
+    const g = parseDeadline(text, NOW);
+    assert.equal(iso(g?.date), expected, text);
+    assert.equal(g?.confident, true, text);
+  }
+});
+
+test('parseDeadline ignores relative dates with no deadline word, and counts from when it was written', () => {
+  assert.equal(parseDeadline('Hackathon this Friday!!', NOW), null);
+  assert.equal(parseDeadline('see you tomorrow', NOW), null);
+  // Sent on Monday 2 November: "before Friday" was 6 November, already passed.
+  const g = parseDeadline('apply before Friday', NOW, new Date(2026, 10, 2, 9, 0))!;
+  assert.equal(iso(g.date), '2026-11-6 23:59');
+  assert.equal(g.passed, true);
+});
+
+test('parseDeadline reads flyer text the way on-device OCR returns it', () => {
+  // Blocks come back one per line, often in capitals, with the date on its own line.
+  const flyer = 'LAGOS DESIGN\nFELLOWSHIP 2027\nAPPLY BY:\n30/11\nfellowship.ng/apply';
+  const g = parseDeadline(flyer, NOW)!;
+  assert.equal(iso(g.date), '2026-11-30 23:59');
+  assert.equal(g.confident, true);
+  assert.equal(iso(parseDeadline('APPLICATIONS CLOSE\n20TH NOVEMBER 2026, 5PM', NOW)?.date), '2026-11-20 17:00');
+  // An event date with no deadline word is a guess the form only offers.
+  const event = parseDeadline('DEMO DAY\n20TH NOVEMBER 2026\nLANDMARK CENTRE', NOW)!;
+  assert.equal(event.confident, false);
+  // A short number pair is only a date right after a deadline word, and never a time.
+  assert.equal(parseDeadline('Final score 3/2', NOW), null);
+  assert.equal(parseDeadline('Deadline 10.30am', NOW), null);
+});
+
+test('pageText keeps descriptions and visible text, drops scripts and markup', () => {
+  const html = `<html><head><title>Fellowship</title>
+    <meta property="og:description" content="Applications close 30 November 2026. Apply now.">
+    <script>var d = "Deadline 1 December 2026"</script><style>p{}</style></head>
+    <body><h1>Design&nbsp;Fellowship</h1><p>Programme starts 10 January 2027</p>
+    <p>Deadline: <strong>15</strong> December 2026</p><p>It&#8217;s free</p></body></html>`;
+  const text = pageText(html);
+  assert.ok(text.includes('Applications close 30 November 2026'));
+  assert.ok(text.includes('Design Fellowship'));
+  assert.ok(text.includes('Deadline: 15 December 2026'));
+  assert.ok(text.includes('It’s free'));
+  assert.ok(!text.includes('var d'));
+  assert.equal(iso(deadlineFromPage(html, NOW)?.date), '2026-11-30 23:59');
+});
+
+test('deadlineFromPage only trusts a date next to a deadline word', () => {
+  assert.equal(deadlineFromPage('<p>Demo day is on 20 November 2026 in Lagos.</p>', NOW), null);
+  assert.equal(deadlineFromPage('<div>nothing here</div>', NOW), null);
+  assert.equal(iso(deadlineFromPage('<li>Applications are due 4 Dec 2026, 6pm</li>', NOW)?.date), '2026-12-4 18:00');
 });
 
 test('parseDeadline prefers the date next to a deadline word', () => {

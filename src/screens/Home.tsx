@@ -399,8 +399,8 @@ function Empty({ onAdd, onImport }: { onAdd: () => void; onImport: () => void })
   const { c } = useTheme();
   const steps: { icon: 'share-2' | 'calendar' | 'bell'; title: string; body: string }[] = [
     { icon: 'share-2', title: 'Share it here', body: 'From WhatsApp, Instagram, TikTok, X or Chrome, tap Share and pick “Save to Shibal”. Flyers work too.' },
-    { icon: 'calendar', title: 'Set the deadline', body: 'Shibal spots dates in the text. Check it and save.' },
-    { icon: 'bell', title: 'Get nudged in time', body: 'A week, three days, a day, and hours before it closes.' },
+    { icon: 'calendar', title: 'Set the deadline', body: 'Shibal looks for it in the text and on the link’s page. Check it and save.' },
+    { icon: 'bell', title: 'Get nudged in time', body: 'Every day from a week out, three times a day near the end, until you apply.' },
   ];
   return (
     <View style={{ marginTop: SPACE.xxl }}>
