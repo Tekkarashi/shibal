@@ -27,7 +27,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const checkHealth = useCallback(async () => {
     try {
       const h = await getHealth();
-      setNeedsSetup(!h.notifications || !h.exactAlarms);
+      setNeedsSetup(!h.notifications || !h.exactAlarms || !h.channel);
     } catch {
       setNeedsSetup(false);
     }

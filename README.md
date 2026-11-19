@@ -100,7 +100,8 @@ The parts worth reading are pure functions in `src/logic.ts` with tests in `test
 
 ```
 src/logic.ts          buckets, reminder ladder, deadline guessing, WhatsApp import, home copy
-src/notifications.ts  permission checks and scheduling
+src/reminderPlan.ts   which reminders should exist and how to sync to them (pure, tested)
+src/notifications.ts  permission checks, the reminders channel, and syncing with Android
 src/pageScan.ts       fetches a saved link's page to look for its deadline
 src/ocr.ts            reads the text on a shared flyer, on the phone
 src/useStore.ts       items and settings, saved on every change

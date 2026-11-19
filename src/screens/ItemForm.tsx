@@ -36,7 +36,7 @@ function clock(d: Date): string {
 }
 
 export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
-  const { store, now } = useApp();
+  const { store, now, needsSetup } = useApp();
   const { c } = useTheme();
   const s = useStyles();
   const toast = useToast();
@@ -284,7 +284,13 @@ export default function ItemForm({ navigation, route }: ScreenProps<'form'>) {
         finish('Saved');
       } else {
         store.addItem(draft);
-        finish(draft.deadline ? 'In the bank. Reminders are set.' : 'In the bank. Add a deadline to get reminders.');
+        finish(
+          !draft.deadline
+            ? 'In the bank. Add a deadline to get reminders.'
+            : needsSetup
+              ? 'In the bank. Turn reminders on in Settings.'
+              : 'In the bank. Reminders are set.',
+        );
       }
     };
     if (past && !editing) {

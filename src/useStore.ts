@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { itemsFromImport, mergeItems, type ImportedLink } from './logic';
 import { rescheduleAll } from './notifications';
 import { loadItems, loadSettings, saveItems, saveSettings } from './storage';
@@ -27,12 +28,25 @@ export function useStore() {
 
   /** Saves to disk right away and re-plans reminders shortly after the last change. */
   const persist = useCallback((nextItems: Item[], nextSettings: Settings) => {
-    saveItems(nextItems).catch(() => undefined);
-    saveSettings(nextSettings).catch(() => undefined);
+    saveItems(nextItems).catch((e) => console.warn('[store] could not save items', String(e)));
+    saveSettings(nextSettings).catch((e) => console.warn('[store] could not save settings', String(e)));
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
-      rescheduleAll(nextItems, nextSettings).catch(() => undefined);
+      timer.current = null;
+      rescheduleAll(nextItems, nextSettings).catch((e) => console.warn('[reminders] sync failed', String(e)));
     }, 350);
+  }, []);
+
+  // A change made just before the app is closed still gets its reminders.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+        rescheduleAll(latest.current.items, latest.current.settings).catch((e) => console.warn('[reminders] sync failed', String(e)));
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   const commit = useCallback(
@@ -45,8 +59,12 @@ export function useStore() {
     [persist],
   );
 
+  /** Hands every reminder to Android again (see diffPlan): on launch, on return to the app, after a permission change. */
   const replan = useCallback(() => {
-    rescheduleAll(latest.current.items, latest.current.settings).catch(() => undefined);
+    return rescheduleAll(latest.current.items, latest.current.settings, { rearm: true }).catch((e) => {
+      console.warn('[reminders] sync failed', String(e));
+      return null;
+    });
   }, []);
 
   const addItem = useCallback(

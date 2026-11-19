@@ -34,6 +34,9 @@ export function cleanupAttachments(keep: (string | null | undefined)[]): void {
     const dir = folder();
     if (!dir.exists) return;
     const used = new Set(keep.filter(Boolean));
+    // No items at all usually means a fresh install, but could mean the list failed to load:
+    // stray images are cheap, a lost flyer is not.
+    if (used.size === 0) return;
     for (const entry of dir.list()) {
       if (entry instanceof File && !used.has(entry.uri)) entry.delete();
     }

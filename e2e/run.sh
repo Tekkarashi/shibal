@@ -33,7 +33,14 @@ alarms=$(adb shell dumpsys alarm | grep -c "$PKG" || true)
 echo "Alarm entries for Shibal: $alarms"
 if [ "$alarms" -lt 1 ]; then echo "FAIL: no alarms scheduled"; exit 1; fi
 
-step "The test reminder is delivered (scheduled 1 minute ahead)"
+step "The test reminder is delivered with Shibal closed (scheduled 1 minute ahead)"
+# Leave the app and let Android reclaim its process, as it does on a phone in a pocket, so this
+# checks the path real reminders take rather than the in-app banner.
+adb shell input keyevent KEYCODE_HOME
+sleep 2
+adb shell am kill "$PKG" || true
+sleep 1
+if adb shell pidof "$PKG" > /dev/null 2>&1; then echo "  (process still alive after am kill)"; else echo "  process gone"; fi
 delivered=0
 for _ in $(seq 1 24); do
   if adb shell dumpsys notification --noredact | grep -q "Test reminder"; then delivered=1; break; fi

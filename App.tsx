@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { AppState, View } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, StackActions, type Theme as NavTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -52,33 +52,38 @@ function openFromOutside<K extends 'form' | 'import'>(name: K, params: RootStack
 
 /** Side effects that need the store and navigation: first-run setup, shares, notification taps. */
 function Effects({ navReady }: { navReady: boolean }) {
-  const { store, checkHealth, now } = useApp();
+  const { store, checkHealth } = useApp();
   const { replan } = store;
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntentContext();
   const toast = useToast();
   const ready = useRef(false);
 
-  // First launch: channel, permission, and an initial plan of every reminder.
+  // Launch: reminders are re-armed first (they do not wait on the permission prompt), then
+  // the channel and permission are set up and the health banner is checked.
   useEffect(() => {
     if (!store.loaded || ready.current) return;
     ready.current = true;
     (async () => {
       cleanupAttachments(store.items.map((i) => i.imageUri));
-      await setupNotifications();
-      await askNotificationPermission();
-      await checkHealth();
+      await setupNotifications().catch((e) => console.warn('[reminders] channel setup failed', String(e)));
       replan();
-    })().catch(() => undefined);
+      await askNotificationPermission().catch(() => false);
+      await checkHealth();
+    })().catch((e) => console.warn('[launch]', String(e)));
   }, [store.loaded, replan, checkHealth]);
 
-  // Re-plan whenever the app comes back to the front (the clock ticks then).
-  const lastPlan = useRef(0);
+  // Coming back to the app: Android may have dropped alarms (force-stop, battery savers), and
+  // permissions may have changed in system settings. Re-arm and re-check, at most every 30 s.
   useEffect(() => {
-    if (!ready.current || now.getTime() - lastPlan.current < 5 * 60_000) return;
-    lastPlan.current = now.getTime();
-    checkHealth();
-    replan();
-  }, [now, replan, checkHealth]);
+    let last = Date.now();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' || !ready.current || Date.now() - last < 30_000) return;
+      last = Date.now();
+      checkHealth();
+      replan();
+    });
+    return () => sub.remove();
+  }, [replan, checkHealth]);
 
   // Something was shared into the app from another app.
   useEffect(() => {

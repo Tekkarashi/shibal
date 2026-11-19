@@ -10,7 +10,8 @@ import { useApp } from '../context';
 import { useConfirm } from '../dialog';
 import { pickWhatsAppExport } from '../importFile';
 import type { ScreenProps } from '../nav';
-import { askExactAlarmPermission, askNotificationPermission, getHealth, scheduledCount, scheduleTest, type Health } from '../notifications';
+import { formatDeadline } from '../logic';
+import { askExactAlarmPermission, askNotificationPermission, CHANNEL_SETTINGS, getHealth, lastPlan, scheduledCount, scheduleTest, type Health, type PlanRecord } from '../notifications';
 import { makeStyles, RADIUS, SPACE, useTheme } from '../theme';
 import { useToast } from '../toast';
 import { UpdatesCard } from '../UpdatesCard';
@@ -80,16 +81,24 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
   const confirm = useConfirm();
   const [health, setHealth] = useState<Health | null>(null);
   const [count, setCount] = useState(0);
+  const [plan, setPlan] = useState<PlanRecord | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       setHealth(await getHealth());
-      setCount(await scheduledCount());
     } catch {
-      setHealth({ notifications: false, exactAlarms: false });
+      setHealth({ notifications: false, exactAlarms: false, channel: false });
     }
+    setCount(await scheduledCount().catch(() => 0));
+    setPlan(await lastPlan());
     checkHealth();
   }, [checkHealth]);
+
+  /** After a permission changes, re-set every reminder so it uses what is now allowed. */
+  const replanAndRefresh = useCallback(async () => {
+    await store.replan();
+    await refresh();
+  }, [store, refresh]);
 
   useEffect(() => {
     refresh();
@@ -102,9 +111,21 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
       data: `package:${Application.applicationId}`,
     }).catch(() => undefined);
 
+  const openChannelSettings = () =>
+    IntentLauncher.startActivityAsync(CHANNEL_SETTINGS.action, { extra: CHANNEL_SETTINGS.extra(Application.applicationId ?? '') }).catch(openAppSettings);
+
   const fixNotifications = async () => {
     const ok = await askNotificationPermission().catch(() => false);
-    if (!ok) {
+    if (ok && health && !health.channel) {
+      const go = await confirm({
+        title: 'Deadline reminders are switched off',
+        message: 'Notifications are allowed, but the “Deadline reminders” category is off. Switch it on in the next screen.',
+        confirm: 'Open settings',
+        cancel: 'Not now',
+        icon: 'bell-off',
+      });
+      if (go) openChannelSettings();
+    } else if (!ok) {
       const go = await confirm({
         title: 'Notifications are blocked',
         message: 'Android won’t ask again from inside the app. Open Shibal’s settings and allow notifications.',
@@ -114,7 +135,7 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
       });
       if (go) openAppSettings();
     }
-    refresh();
+    replanAndRefresh();
   };
 
   const fixAlarms = async () => {
@@ -126,7 +147,7 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
         confirm: 'Got it',
         icon: 'clock',
       });
-    refresh();
+    replanAndRefresh();
   };
 
   const openBattery = () =>
@@ -190,7 +211,11 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
     else if ('error' in res) toast({ message: res.error, icon: 'alert-circle' });
   };
 
-  const allGood = !!health?.notifications && !!health?.exactAlarms;
+  const notificationsOk = !!health?.notifications && !!health?.channel;
+  const allGood = notificationsOk && !!health?.exactAlarms;
+  const nextLine = plan?.next
+    ? `Next: ${formatDeadline(plan.next.at, new Date())}, “${plan.next.title}”.`
+    : 'Nothing to remind you about yet. Reminders start a week before a deadline.';
 
   const status = (ok: boolean | undefined, fix: () => void) =>
     ok ? <Pill tone="ok" icon="check" label="On" /> : <Button kind="primary" small label="Allow" onPress={fix} />;
@@ -222,8 +247,13 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
               {health === null ? 'Checking reminders…' : allGood ? 'Reminders will reach you' : 'Reminders need a hand'}
             </T>
             <T v="small" style={{ color: allGood ? c.ok : c.danger, opacity: 0.85 }}>
-              {count} reminder{count === 1 ? '' : 's'} scheduled on this phone.
+              {count} reminder{count === 1 ? '' : 's'} scheduled on this phone. {nextLine}
             </T>
+            {plan && plan.failed > 0 ? (
+              <T v="small" style={{ color: c.danger, marginTop: 2 }}>
+                Android refused {plan.failed} reminder{plan.failed === 1 ? '' : 's'}: {plan.error}
+              </T>
+            ) : null}
           </View>
         </View>
 
@@ -236,7 +266,7 @@ export default function Settings({ navigation }: ScreenProps<'settings'>) {
 
         <SectionLabel>Reminder health</SectionLabel>
         <Card>
-          <Row icon="bell" title="Notifications" body="Needed for every reminder." right={status(health?.notifications, fixNotifications)} />
+          <Row icon="bell" title="Notifications" body="Needed for every reminder." right={status(health === null ? undefined : notificationsOk, fixNotifications)} />
           <Divider inset={62} />
           <Row icon="clock" title="Alarms and reminders" body="Lets reminders fire at the exact minute." right={status(health?.exactAlarms, fixAlarms)} />
           <Divider inset={62} />

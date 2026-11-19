@@ -116,7 +116,7 @@ appId: com.tekkarashi.shibal
 - extendedWaitUntil:
     visible: "Reminders will reach you"
     timeout: 10000
-- assertVisible: "[1-9][0-9]* reminders? scheduled on this phone\\."
+- assertVisible: "[1-9][0-9]* reminders? scheduled on this phone\\..*"
 - takeScreenshot: 06-settings-health
 # An update offer may sit above, so bring the button into view first.
 - scrollUntilVisible:
