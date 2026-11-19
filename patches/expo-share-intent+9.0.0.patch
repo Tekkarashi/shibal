@@ -1,5 +1,5 @@
 diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-index ff5b100..6bda6dd 100644
+index ff5b100..f6cf35d 100644
 --- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
 +++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
 @@ -55,6 +55,30 @@ class ExpoShareIntentModule : Module() {
@@ -105,3 +105,15 @@ index ff5b100..6bda6dd 100644
                  // text / urls
                  if (intent.action == Intent.ACTION_SEND) {
                      notifyShareIntent(mapOf(
+@@ -198,6 +243,11 @@ class ExpoShareIntentModule : Module() {
+ 
+         OnNewIntent {
+             handleShareIntent(it)
++            // Handled now, so drop the copy MainActivity kept for a cold start (plugins/withShareOnNewIntent.js).
++            if (ExpoShareIntentSingleton.intent === it) {
++                ExpoShareIntentSingleton.intent = null
++                ExpoShareIntentSingleton.isPending = false
++            }
+         }
+ 
+         OnCreate {

@@ -69,6 +69,7 @@
       "./plugins/withE2eFileAccess",
       "expo-sharing",
       "./plugins/withTextRecognitionModel",
+      "./plugins/withShareOnNewIntent",
       "./plugins/withReleaseSigning"
     ],
     "userInterfaceStyle": "automatic",
