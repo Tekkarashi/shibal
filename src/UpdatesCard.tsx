@@ -121,7 +121,7 @@ function RegularUpdate() {
       </View>
 
       {offer && u.info!.notes ? (
-        <T v="small" style={s.notes} numberOfLines={10}>
+        <T v="small" style={s.notes}>
           {u.info!.notes}
         </T>
       ) : null}

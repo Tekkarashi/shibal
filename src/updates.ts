@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
-import { Directory, File, Paths } from 'expo-file-system';
+import { Directory, DownloadTask, File, Paths } from 'expo-file-system';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { isNewerVersion, releaseNotesSummary } from './logic';
 
@@ -64,21 +64,85 @@ export async function findUpdate(): Promise<UpdateInfo | null> {
   return latest && isNewerVersion(latest.version, installedVersion()) ? latest : null;
 }
 
-/** Downloads the update's APK into the app's cache, reporting progress from 0 to 1. */
+/** How a download that stopped is explained, with how far it got. */
+export class DownloadStopped extends Error {
+  constructor(public readonly fraction: number, cause: unknown) {
+    const pct = Math.floor(fraction * 100);
+    super(
+      `The download stopped${pct > 0 ? ` at ${pct}%` : ''}: the connection is slow or dropped. ` +
+        'Tap Try again to carry on from there.',
+    );
+    this.name = 'DownloadStopped';
+    console.warn('[update] download stopped', String(cause));
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Downloads the update's APK into the app's cache, reporting progress from 0 to 1.
+ *
+ * Built for slow and patchy mobile data: the file is written as `.part` and every retry, by
+ * itself or from Try again (even after Shibal was closed), carries on from the bytes already
+ * saved instead of starting over. It retries on its own while the download keeps moving, and
+ * gives up only after a few attempts in a row get nowhere.
+ */
 export async function downloadUpdate(info: UpdateInfo, onProgress: (fraction: number) => void): Promise<File> {
   const dir = new Directory(Paths.cache, 'updates');
-  if (dir.exists) dir.delete(); // only ever keep the one being installed
-  dir.create({ intermediates: true });
-  const dest = new File(dir, `Shibal-${info.version}.apk`);
-  const file = await File.downloadFileAsync(info.apkUrl, dest, {
-    idempotent: true,
-    onProgress: ({ bytesWritten, totalBytes }) => {
-      const total = totalBytes > 0 ? totalBytes : info.sizeBytes;
-      if (total > 0) onProgress(Math.min(1, bytesWritten / total));
-    },
-  });
+  if (!dir.exists) dir.create({ intermediates: true });
+  const name = `Shibal-${info.version}.apk`;
+  // Only ever keep the version being installed (finished or partial).
+  for (const entry of dir.list()) {
+    if (!entry.name.startsWith(name)) entry.delete();
+  }
+
+  const done = new File(dir, name);
+  const expected = info.sizeBytes > 0 ? info.sizeBytes : null;
+  if (done.exists && (expected === null || done.size === expected)) {
+    onProgress(1);
+    return done;
+  }
+  if (done.exists) done.delete();
+
+  const part = new File(dir, `${name}.part`);
+  const sizeOf = (f: File) => (f.exists ? f.size : 0);
+  const report = ({ bytesWritten, totalBytes }: { bytesWritten: number; totalBytes: number }) => {
+    const total = expected ?? (totalBytes > 0 ? totalBytes : 0);
+    if (total > 0) onProgress(Math.min(1, bytesWritten / total));
+  };
+
+  let attempts = 0;
+  let stuck = 0;
+  for (;;) {
+    const before = sizeOf(part);
+    if (expected !== null && before > expected) part.delete(); // something is off; start clean
+    const offset = sizeOf(part);
+    try {
+      if (offset > 0) {
+        report({ bytesWritten: offset, totalBytes: expected ?? -1 });
+        const task = DownloadTask.fromSavable(
+          { url: info.apkUrl, fileUri: part.uri, isDirectory: false, resumeData: String(offset) },
+          { onProgress: report },
+        );
+        await task.resumeAsync();
+      } else {
+        await new DownloadTask(info.apkUrl, part, { onProgress: report }).downloadAsync();
+      }
+      if (expected !== null && sizeOf(part) !== expected) throw new Error(`got ${sizeOf(part)} of ${expected} bytes`);
+      break;
+    } catch (e) {
+      const after = sizeOf(part);
+      stuck = after > offset ? 0 : stuck + 1;
+      attempts++;
+      if (stuck >= 3 || attempts >= 15) throw new DownloadStopped(expected ? after / expected : 0, e);
+      console.warn(`[update] attempt ${attempts} stopped at ${after} bytes, retrying`, String(e));
+      await sleep(Math.min(2000 * 2 ** stuck, 15_000));
+    }
+  }
+
+  part.move(done);
   onProgress(1);
-  return file;
+  return done;
 }
 
 /**
